@@ -1,0 +1,40 @@
+@import url('http:////fonts.googleapis.com/css?family=Roboto:300');
+body {
+    background: #eee;
+    margin: 2em;
+    text-align: center
+}
+canvas {
+    background-image: url(kitty_bg.jpg);
+}
+#dialog-message-help {
+    text-align: left;
+}
+#game {
+    background: #fff;
+    border: 1px solid #ccc;
+    width: 601px;
+    height: 600px;
+    margin: auto;
+}
+#board {
+    background: #fff;
+    width: 300px;
+    height: 600px;
+    float: left;
+}
+#panel {
+    background: #333;
+    color: #09c;
+    border-left: 1px solid #ccc;
+    width: 298px;
+    height: 600px;
+    float: right;
+}
+.display {
+    font-family: "Roboto", sans-serif;
+    font-size: 30px;
+    margin-top: 120px;
+    color: #3cf;
+}
+
