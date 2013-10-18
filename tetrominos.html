@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+    <!--  
+        * Tetrominos v0.3: html5 *etris clone from scratch
+        * Copyright (C) 2013 Gael Abadin
+    -->
+    <head>
+        <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+        <title>Tetrominos - html5 *etris clone from scratch.</title>
+        <link href="tstyle.css" rel="stylesheet" type="text/css">
+        <link rel="stylesheet" href="http://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css" />
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
+        <script type="text/javascript" src="fallingTetrominos3.js"></script>
+    </head>
+    <body>
+        <div id="wrapper">
+            <div id="header">
+                <h1> Tetrominos. </h1>
+            </div>
+            <div id="game">
+                <div id="board">
+                    <canvas id="tcanvas" width="300" height="600">
+                        Tetrominos.
+                    </canvas>
+                </div>
+                <div id="panel">
+                    <div id="game-stats" class="display">
+                        Level
+                        <br />
+                        <span id="level">N/A</span>
+                        <br />
+                        Lines
+                        <br />
+                        <span id="lines">N/A</span>
+                        <br />
+                        Score
+                        <br />
+                        <span id="score">N/A</span>
+                        <br />
+                    </div>
+                    <br />
+                    Press `p` for pause, `h` for help.
+                </div>
+            </div>
+            <div id="footer">
+                <p>
+                    Note: Game developed for educational purposes only. And fun.
+                    <br />
+                    Contact: <a href="http://github.com/elcodedocle">github.com/elcodedocle</a>
+                </p>
+                <p>
+                    <sub><i>Cat picture credit: <a href="http://www.funnycatsite.com">funnycatsite.com</a> through <a href="http://amolife.com">amolife.com</a></i></sub>
+                </p>
+            </div>
+        </div>
+        <div id="dialog-message-help" title="Help">
+            <p>
+                Key map:
+            </p>
+            <p style="padding-left:20px;">
+                left/right/down arrow : move left/right/down<br />
+                a,d : rotate left/right<br />
+                spacebar : dump the piece<br />
+                p : pause/continue<br />
+                h : this help<br />
+            </p>
+        </div>
+        <div id="dialog-message-gover" title="Game over">
+            <p>
+                Game Over
+            </p>
+            <div id="first">
+                <p>You got the highest score!</p>
+                <p>
+                    Your score: <span class="yourscore"></span><br />
+                    (No previous scores saved on this device)
+                </p>
+            </div>
+            <div id="win">
+                <p>You got the highest score!</p>
+                <p>
+                    Your score: <span class="yourscore"></span><br />
+                    Previous highest score on this location: <span class="highscore"></span>
+                </p>
+            </div>
+            <div id="lose">
+                <p>
+                    Your score: <span class="yourscore"></span><br />
+                    Highest score on this location: <span class="highscore"></span>
+                </p>
+            </div>
+        </div>
+    </body>
+</html>
