@@ -80,7 +80,7 @@ function worldClass(worldMap) {
     this.getGridParams = function(){ return {width: grid.width, height: grid.height}; };
 
     this.isClear = function(x,y){
-        if (y<0) return true;
+        if (y<0) return true; //over the top is always clear
         if (x<0||x>=grid.width||y>=grid.height) return false;
         if (grid.content[x][y] === 'clear' ||
             grid.content[x][y] === undefined) {
@@ -176,8 +176,8 @@ function tEngineClass(){
     var points = null;
     var level = null;
     this.getLevel = function(){return level;};
-    var startLevel = 0;
-    var processInterval = 100;
+    var startLevel = 1;
+    var fps = 25;
     var processIntervalId = undefined;
     var keyDownInterval = 200;
     var keyDownIntervalIds = {
@@ -238,17 +238,20 @@ function tEngineClass(){
     };
     var resolve = function() {
         /*
-         * 1)if lines to chop:
+         * 1)If lines to chop:
          * -chop lines,
          * -increase lines,(level),points
-         * -test end of game
+         * -test end of game (canvas overflow)
          * 
          * 2)If not EOG: call new tetromino
+         * 
+         * 3) Test end of game (grid override)
          * 
          * `count` is a shitty name for a list  of lines to chop.
          * `countLines()` is a textbook case of naming convention misguidancy.
          * 
          */
+
         var count = tWorld.countLines();
         tWorld.updateGrid(count);
         
@@ -259,7 +262,8 @@ function tEngineClass(){
         $('#level').text(level);
         $('#lines').text(lines);
         $('#score').text(points);
-        var bOver = false;
+        
+        var bOver = false; 
         var coords = tTromino.getCurrentCoordinates();
         for ( var i = 0;i<coords.y.length;i++) {
             if (coords.y[i]<0){
@@ -267,7 +271,7 @@ function tEngineClass(){
                 bOver = true;
                 break;
             }
-        } 
+        }
         if (!bOver){
             tTromino.stop();
             actionsBuffer = [];
@@ -277,7 +281,17 @@ function tEngineClass(){
                     -1,
                     tTrominoClass.types(Math.floor(Math.random() * 7)),
                     0);
-            tTromino.go();
+            coords = tTromino.getCurrentCoordinates();
+            for ( var i = 0;i<coords.y.length;i++) {
+                if (coords.y[i]>=0&&!tWorld.isClear(coords.x[i],coords.y[i])){
+                    gameOver();
+                    bOver = true;
+                    break;
+                }
+            }
+            if (!bOver){
+                tTromino.go();
+            }
         }
     };
     var process = function() {
@@ -333,7 +347,10 @@ function tEngineClass(){
         if (command[0] !== undefined) {
             var interval = keyDownInterval;
             if (command[0] === 'moveLeft' || command[0] === 'moveRight'){
-                interval = Math.min(keyDownInterval, Math.max(Math.ceil(tTromino.fallInterval/(2*level+1)),90));
+                interval = Math.min(keyDownInterval, Math.max(Math.ceil(1000/
+                    (1000/tTromino.fallInterval
+                   +(1000*tEngine.getLevel()/tTromino.fallInterval)
+                )),100));
             }
             if (keyDownIntervalIds[command[0]] === undefined) {
                 actionsBuffer.push(command[0]);
@@ -374,8 +391,10 @@ function tEngineClass(){
         $(window).keydown(keyDown);
         $(window).keyup(keyUp);
         tTromino.go();
-        processIntervalId = setInterval(process,
-                Math.ceil(processInterval/(2*level+1)));
+        processIntervalId = setInterval(
+            process,
+            Math.ceil(1000/fps)
+        );
     };
     var stop = function() {
         tTromino.stop();
@@ -477,7 +496,15 @@ function tTrominoClass(actionsBuffer,positionX,positionY,tType,rot) {
         return false;
     };
     this.go = function(){
-        fallIntervalId=setInterval(function(){actionsBuffer.push('moveDown');},Math.ceil(tThis.fallInterval/(2*tEngine.getLevel()+1)));
+        fallIntervalId=setInterval(
+            function(){actionsBuffer.push('moveDown');},
+            Math.ceil(
+                1000/(
+                    1000/tThis.fallInterval
+                   +(1000*tEngine.getLevel()/tThis.fallInterval)
+                )
+            )
+        );
     };
     this.stop = function(){
         clearInterval(fallIntervalId);
