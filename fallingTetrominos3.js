@@ -4,7 +4,6 @@
  * 
  * TODO:
  * 
- * Store highest score locally (no name)
  * Menu: 
  *  -Select start level
  *  -High scores chart
@@ -24,7 +23,8 @@
  * to github.com/elcodedocle
  * 
  */
-
+/*jslint vars: true, passfail: false */
+/*global $ */
 function worldClass(worldMap) {
     /**
      * Defines and updates a World, which consists on:
@@ -39,8 +39,10 @@ function worldClass(worldMap) {
      *  
      */
     
-    var canvas=null, context=null, grid=null, cell=null;
+    'use strict';
     
+    var canvas=null, context=null, grid=null, cell=null;
+
     var setCell = function(){
         cell = {
             width : Math.floor(canvas.width
@@ -49,14 +51,13 @@ function worldClass(worldMap) {
                     / grid.height)
         };
     };
-    this.setCanvas = function(c){
+    function setCanvas(c){
         //some exception handling would be nice...
         canvas = c;
-        canvas.width = canvas.width;
+        canvas.width = c.width; //clears the canvas
         context = canvas.getContext('2d');
         setCell();
-    };  
-    this.getCanvas = function(){ return canvas; };
+    }  
     
     if (worldMap ===  undefined){
         grid = {
@@ -64,11 +65,11 @@ function worldClass(worldMap) {
             height : 20,
             content : []
         };
-        this.setCanvas($('#tcanvas')[0]);
+        setCanvas($('#tcanvas')[0]);
     } else {
         //some exception handling would be nice...
         grid = worldMap.grid;
-        this.setCanvas(worldMap.canvas);
+        setCanvas(worldMap.canvas);
     }
     for (var i=0;i<grid.width;i++){
         grid.content.push([]);
@@ -103,9 +104,6 @@ function worldClass(worldMap) {
     };
     
     this.draw = function(fillColor,pos) {
-        //a little big ol' fashioned console debugging:
-        //console.log('draw: '+fillColor);
-        //console.log(pos);
         context.lineWidth = 1;
         var fComm;
         if (fillColor==='clear'){
@@ -123,7 +121,7 @@ function worldClass(worldMap) {
         // cell.height ); 
         // (nothing but a reminder of the existence of strokeRect)
     };
-    this.updateGrid = function(count){
+    this.updateGrid = function (count){
         //count is a shitty name for this var
         var stop = Math.max.apply(null,count);
         if (stop === -Infinity) return;
@@ -167,7 +165,10 @@ function tEngineClass(){
      * regularly (100/(2*level+1) ms interval) by function process().
      * 
      */
-    var tThis=this;
+
+    'use strict';
+
+    var tThis = this;
     var tWorld = null;
     var actionsBuffer = [];
     var tTromino = null;
@@ -188,15 +189,15 @@ function tEngineClass(){
         pause : undefined
     };
     var actions = {
-        rotateLeft : tEngineClass.keyValue('a'),
-        rotateRight : tEngineClass.keyValue('d'),
-        moveLeft : tEngineClass.keyValue('leftArrow'),
-        moveRight : tEngineClass.keyValue('rightArrow'),
-        moveDown : tEngineClass.keyValue('downArrow'),
-        drop : tEngineClass.keyValue('spacebar'),
-        pause : tEngineClass.keyValue('p'),
-        help : tEngineClass.keyValue('h'),
-        restart : tEngineClass.keyValue('r')
+        rotateLeft : keyValue('a'),
+        rotateRight : keyValue('d'),
+        moveLeft : keyValue('leftArrow'),
+        moveRight : keyValue('rightArrow'),
+        moveDown : keyValue('downArrow'),
+        drop : keyValue('spacebar'),
+        pause : keyValue('p'),
+        help : keyValue('h'),
+        restart : keyValue('r')
     };
     var move = function() {
         tWorld.draw('clear',tTromino.getCurrentCoordinates());
@@ -252,15 +253,12 @@ function tEngineClass(){
         tWorld.updateGrid(count);
         
         lines+=count.length;
-        points+=count.length*count.length*200;
+        points+=count.length*count.length*(level+1)*100;
         level = startLevel + Math.floor(lines/10);
         
         $('#level').text(level);
         $('#lines').text(lines);
         $('#score').text(points);
-        //console.log('lines: '+lines);
-        //console.log('points: '+points);
-        //console.log('level: '+level);
         var bOver = false;
         var coords = tTromino.getCurrentCoordinates();
         for ( var i = 0;i<coords.y.length;i++) {
@@ -272,6 +270,7 @@ function tEngineClass(){
         } 
         if (!bOver){
             tTromino.stop();
+            actionsBuffer = [];
             tTromino = new tTrominoClass(
                     actionsBuffer,
                     Math.floor(tWorld.getGridParams().width / 2) - 1, 
@@ -287,16 +286,11 @@ function tEngineClass(){
         var action = actionsBuffer.shift();
         var t = tTromino.getType();
         var p = tTromino.getPosition();
-        //console.log(action);
-        //console.log(t);
-        //console.log(p);
-        //console.log(tTrominoClass.rotations(t));
         var l = tTrominoClass.rotations(t).length;
         var r = tTromino.getRotation();
 
         
         if (action === 'moveDown') {
-            //console.log(getBorder(tTrominoClass.getCoordinates(t,{x:p.x,y:p.y+1},r)).distance);
             if (getBorder(tTrominoClass.getCoordinates(t,{x:p.x,y:p.y+1},r)).distance>=0){
                 tTromino.vector[1]++;
             } else {
@@ -324,7 +318,6 @@ function tEngineClass(){
             stop();
             return;
         } else if (action === 'help') {
-            console.log(action);
             stop();
             $( "#dialog-message-help" ).dialog( "open" );
             return;
@@ -333,21 +326,22 @@ function tEngineClass(){
         move();
     };
     var keyDown = function(event) {
-        
-        //console.log('char:' + event.which);
 
         var command = Object.keys(actions).filter(function(key) {
             return actions[key] === event.which;
         });
         if (command[0] !== undefined) {
-            //console.log(command[0]);
+            var interval = keyDownInterval;
+            if (command[0] === 'moveLeft' || command[0] === 'moveRight'){
+                interval = Math.min(keyDownInterval, Math.max(Math.ceil(tTromino.fallInterval/(2*level+1)),90));
+            }
             if (keyDownIntervalIds[command[0]] === undefined) {
                 actionsBuffer.push(command[0]);
                 keyDownIntervalIds[command[0]] = setInterval(
                     function() {
                         actionsBuffer.push(command[0]);
                     }, 
-                    keyDownInterval
+                    interval
                 );
             }
         }
@@ -381,12 +375,12 @@ function tEngineClass(){
         $(window).keyup(keyUp);
         tTromino.go();
         processIntervalId = setInterval(process,
-                processInterval/(2*level+1));
+                Math.ceil(processInterval/(2*level+1)));
     };
     var stop = function() {
         tTromino.stop();
         $(window).unbind('keydown');
-        for (i in keyDownIntervalIds) {
+        for (var i in keyDownIntervalIds) {
             clearInterval(keyDownIntervalIds[i]);
         }
         clearInterval(processIntervalId);
@@ -395,8 +389,7 @@ function tEngineClass(){
                 return actions[key] === event.which;
             });
             if (command[0] === 'pause') {
-                //console.log(command[0]);
-                tThis.go();
+                tThis.go();//tThis in case `stop` turns public in future versions
                 return;
             }
         });
@@ -423,23 +416,23 @@ function tEngineClass(){
         }
         $( "#dialog-message-gover" ).dialog( "open" );
     };
+    function keyValue(key){
+        var keys = {
+            a: 65,
+            h: 72,
+            d: 68,
+            p: 80,
+            intro : 13,
+            spacebar : 32,
+            leftArrow : 37,
+            upArrow : 38,
+            rightArrow : 39,
+            downArrow : 40
+        };
+        return keys[key];
+    }
 }
 
-tEngineClass.keyValue = function(key){
-    var keys = {
-        a: 65,
-        h: 72,
-        d: 68,
-        p: 80,
-        intro : 13,
-        spacebar : 32,
-        leftArrow : 37,
-        upArrow : 38,
-        rightArrow : 39,
-        downArrow : 40
-    };
-    return keys[key];
-};
 
 function tTrominoClass(actionsBuffer,positionX,positionY,tType,rot) {
     /**
@@ -452,6 +445,10 @@ function tTrominoClass(actionsBuffer,positionX,positionY,tType,rot) {
      * providing the game is not paused.
      * 
      */
+    
+    'use strict';
+    
+    var tThis = this;
     var position = (positionX===undefined||positionY===undefined)?{
         x : 0,
         y : 0
@@ -459,16 +456,15 @@ function tTrominoClass(actionsBuffer,positionX,positionY,tType,rot) {
         x:positionX,
         y:positionY
     };
-    var type = (tType===undefined)?tTrominoClass.types(Math.floor(Math.random() * 7)):tType;
+    var type = (tType===undefined)?this.types(Math.floor(Math.random() * 7)):tType;
     var rotation = (rot===undefined)?0:rot;
-    var fallInterval = 1000;
     var fallIntervalId = undefined;
-    var tThis = this;
+    this.fallInterval = 1000;
     this.vector = [ 0, 0, 0 ];
     this.getType = function(){return type;};
     this.getPosition = function(){return position;};
     this.getRotation = function(){return rotation;};
-    this.getCurrentCoordinates = function (){
+    this.getCurrentCoordinates = function(){
         return tTrominoClass.getCoordinates(type,position,rotation);
     };
     this.isCurrent = function(x,y){
@@ -481,81 +477,74 @@ function tTrominoClass(actionsBuffer,positionX,positionY,tType,rot) {
         return false;
     };
     this.go = function(){
-        fallIntervalId=setInterval(function(){actionsBuffer.push('moveDown');},fallInterval/(2*tEngine.getLevel()+1));
+        fallIntervalId=setInterval(function(){actionsBuffer.push('moveDown');},Math.ceil(tThis.fallInterval/(2*tEngine.getLevel()+1)));
     };
     this.stop = function(){
         clearInterval(fallIntervalId);
     };
-    this.updatePosition = function (){
-        //console.log('x:'+position.x+', y:'+position.y);
+    this.updatePosition = function(){
         position.x += tThis.vector[0];
         position.y += tThis.vector[1];
-        //console.log('x:'+position.x+', y:'+position.y);
-        //console.log(tThis.vector);
         rotation = (rotation
                 + tTrominoClass.rotations(type).length 
                 + (tThis.vector[2] % tTrominoClass.rotations(type).length))
                 % tTrominoClass.rotations(type).length;
         tThis.vector = [ 0, 0, 0 ];
     };
+    tTrominoClass.getCoordinates = function(type,position,rotation) {
+        var pos = {
+            x : [],
+            y : []
+        };
+        var rots = tTrominoClass.rotations(type);
+        for ( var i = 0;i<rots[rotation].x.length;i++) {
+            pos.x.push(rots[rotation].x[i] + position.x);
+            pos.y.push(rots[rotation].y[i] + position.y);
+        }
+        return pos;
+    };
+    
+    tTrominoClass.colors = function(type) {
+        var colors = {
+            I : '#000',
+            O : '#f00',
+            T : '#0ff',
+            J : '#00f',
+            L : '#ff0',
+            S : '#f0f',
+            Z : '#0f0'  
+        };
+        return colors[type];
+    };
 }
-tTrominoClass.types = function (index){ 
-    var types = [ 'I', 'O', 'T', 'J', 'L', 'S', 'Z' ];
-    return types[index];
-};
-tTrominoClass.colors = function(type) {
-    var colors = {
-        I : '#000',
-        O : '#f00',
-        T : '#0ff',
-        J : '#00f',
-        L : '#ff0',
-        S : '#f0f',
-        Z : '#0f0'  
+    tTrominoClass.rotations = function(type){
+        var rotations = { I:[{x:[0,1,2,3],y:[0,0,0,0]},
+                             {x:[1,1,1,1],y:[-2,-1,0,1]}],
+                          O:[{x:[0,0,1,1],y:[0,1,0,1]}],
+                          T:[{x:[0,1,1,2],y:[0,1,0,0]},
+                             {x:[0,1,1,1],y:[0,1,0,-1]},
+                             {x:[1,0,1,2],y:[-1,0,0,0]},
+                             {x:[1,1,1,2],y:[-1,1,0,0]}],
+                          J:[{x:[0,1,2,2],y:[0,0,0,1]},
+                             {x:[1,1,0,1],y:[-1,0,1,1]},
+                             {x:[0,0,1,2],y:[-1,0,0,0]},
+                             {x:[0,0,0,1],y:[-1,0,1,-1]}],
+                          L:[{x:[1,0,0,2],y:[0,0,1,0]},
+                             {x:[0,1,1,1],y:[-1,-1,0,1]},
+                             {x:[1,0,2,2],y:[0,0,-1,0]},
+                             {x:[0,0,0,1],y:[-1,0,1,1]}],
+                          S:[{x:[1,2,0,1],y:[0,0,1,1]},
+                             {x:[0,0,1,1],y:[-1,0,0,1]}],
+                          Z:[{x:[0,1,1,2],y:[0,0,1,1]},
+                             {x:[1,0,1,0],y:[-1,0,0,1]}]
+                        };
+        return rotations[type];
     };
-    return colors[type];
-};
-tTrominoClass.rotations = function(type){
-    var rotations = { I:[{x:[0,1,2,3],y:[0,0,0,0]},
-                         {x:[1,1,1,1],y:[-2,-1,0,1]}],
-                      O:[{x:[0,0,1,1],y:[0,1,0,1]}],
-                      T:[{x:[0,1,1,2],y:[0,1,0,0]},
-                         {x:[0,1,1,1],y:[0,1,0,-1]},
-                         {x:[1,0,1,2],y:[-1,0,0,0]},
-                         {x:[1,1,1,2],y:[-1,1,0,0]}],
-                      J:[{x:[0,1,2,2],y:[0,0,0,1]},
-                         {x:[1,1,0,1],y:[-1,0,1,1]},
-                         {x:[0,0,1,2],y:[-1,0,0,0]},
-                         {x:[0,0,0,1],y:[-1,0,1,-1]}],
-                      L:[{x:[1,0,0,2],y:[0,0,1,0]},
-                         {x:[0,1,1,1],y:[-1,-1,0,1]},
-                         {x:[1,0,2,2],y:[0,0,-1,0]},
-                         {x:[0,0,0,1],y:[-1,0,1,1]}],
-                      S:[{x:[1,2,0,1],y:[0,0,1,1]},
-                         {x:[0,0,1,1],y:[-1,0,0,1]}],
-                      Z:[{x:[0,1,1,2],y:[0,0,1,1]},
-                         {x:[1,0,1,0],y:[-1,0,0,1]}]
-                    };
-    return rotations[type];
-};
-tTrominoClass.getCoordinates = function(type,position,rotation) {
-    var pos = {
-        x : [],
-        y : []
+    tTrominoClass.types = function (index){ 
+        var types = [ 'I', 'O', 'T', 'J', 'L', 'S', 'Z' ];
+        return types[index];
     };
-    var rots = tTrominoClass.rotations(type);
-    //console.log(type);
-    //console.log(rotation);
-    //console.log(rots);
-    //console.log(rots[rotation]);
-    for ( var i = 0;i<rots[rotation].x.length;i++) {
-        pos.x.push(rots[rotation].x[i] + position.x);
-        pos.y.push(rots[rotation].y[i] + position.y);
-    }
-    // console.log(pos);
-    return pos;
-};
-
+    
 /**
  * Ride on!
  */
