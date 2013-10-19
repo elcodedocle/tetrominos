@@ -248,7 +248,7 @@ function tEngineClass(){
          * 3) Test end of game (grid override)
          * 
          * `count` is a shitty name for a list  of lines to chop.
-         * `countLines()` is a textbook case of naming convention misguidancy.
+         * `countLines()` is a textbook case of naming convention misguidance.
          * 
          */
 
