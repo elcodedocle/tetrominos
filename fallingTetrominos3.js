@@ -162,7 +162,7 @@ function tEngineClass(){
      * user (keyDown/Up) events.
      * 
      * Actions are registered and stored in actionsBuffer[], and processed 
-     * regularly (100/(2*level+1) ms interval) by function process().
+     * regularly at 25 fps by function process().
      * 
      */
 
