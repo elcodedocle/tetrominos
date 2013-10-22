@@ -43,7 +43,7 @@ var worldClass = function(initParams) {
     var tThis = this;
     initParams = initParams||{};
     tThis.geinitParams = function (){return initParams;};
-    var canvas = null, context=null, grid=null, cell=null;
+    var canvas=null, context=null, grid=null, cell=null;
 
     this.setCell = function(){
         cell = {
@@ -128,7 +128,7 @@ var worldClass = function(initParams) {
         }
     };
     this.redrawDirtyCells = function(assumeDirty){
-        if (assumeDirty===undefined) { assumeDirty = false; }
+        assumeDirty = assumeDirty||false;
         context.lineWidth = 1;
         for (var x=0;x<grid.width;x++){
             for (var y=0;y<=grid.height;y++){
@@ -187,19 +187,20 @@ var tEngineClass = function(initParams){
     var tThis = this;
     initParams = initParams||{};
     tThis.geinitParams = function (){return initParams;};
-    var tWorld = null; //to be set by tThis.start()
+    var tWorld = initParams.tWorld||null; 
     this.getWorld = function(){ return tWorld; };
     var actionsBuffer = initParams.actionsBuffer||[];
-    var tTromino = null; //ditto
-    var lines = null; //ditto
-    var points = null; //ditto
-    var startLevel = null; //ditto
-    var level = null; //ditto
+    var tTromino = initParams.tTromino||null; 
+    var lines = initParams.lines||null; 
+    var points = initParams.points||null; 
+    var startLevel = initParams.startLevel||null; 
+    var level = initParams.level||null; 
     var $lines = initParams.$lines||$('#lines');
     var $score = initParams.$score||$('#score');
     var $level = initParams.$level||$('#level');
     this.getLevel = function(){return level;};
     var $help = initParams.$help||$( "#dialog-message-help" );
+    var onPause = initParams.onPause||null;
     var $gover = initParams.$gover||$( "#dialog-message-gover" );
     var $win = initParams.$win||$('#win');
     var $lose = initParams.$lose||$('#lose');
@@ -398,6 +399,7 @@ var tEngineClass = function(initParams){
                     );
                     break;
                 case  'pause':
+                    tThis.onPause = true;
                     stop();
                     return;
                 case  'help':
@@ -445,15 +447,15 @@ var tEngineClass = function(initParams){
         clearInterval(keyDownIntervalIds[command[0]]);
         keyDownIntervalIds[command[0]] = undefined;
     };
-    this.start = function(initParams){
-        initParams = initParams||{};
-        tWorld = initParams.tWorld?
-            initParams.tWorld:
-            initParams.tWorldInitParams?
-                new worldClass(initParams.tWorldInitParams):
+    this.start = function(){
+        var sIParams = initParams.startInitParams||{};
+        tWorld = sIParams.tWorld?
+            sIParams.tWorld:
+            sIParams.tWorldInitParams?
+                new worldClass(sIParams.tWorldInitParams):
                 new worldClass();
-        tTromino = initParams.tTrominoInitParams?
-            new tTrominoClass(tThis, initParams.tTrominoInitParams):
+        tTromino = sIParams.tTrominoInitParams?
+            new tTrominoClass(tThis, sIParams.tTrominoInitParams):
             new tTrominoClass(
                 tThis,
                 Math.floor(tWorld.getGridParams().width / 2) - 1, 
@@ -461,16 +463,17 @@ var tEngineClass = function(initParams){
                 tTrominoClass.types(Math.floor(Math.random() * 7)),
                 0
             );
-        lines = initParams.lines||0;
-        points = initParams.points||0;
-        startLevel = initParams.startLevel||defaultStartLevel;
-        level = initParams.level||startLevel;
+        lines = sIParams.lines||0;
+        points = sIParams.points||0;
+        startLevel = sIParams.startLevel||defaultStartLevel;
+        level = sIParams.level||startLevel;
         $level.text(level);
         $lines.text(lines);
         $score.text(points);
         tThis.go();
     };
     this.go = function() {
+        tThis.onPause = false;
         $(window).unbind('keydown');
         $(window).keydown(keyDown);
         $(window).keyup(keyUp);
@@ -486,7 +489,7 @@ var tEngineClass = function(initParams){
             var command = Object.keys(actions).filter(function(key) {
                 return actions[key] === event.which;
             });
-            if (command[0] === 'pause') {
+            if ((command[0] === 'pause')&&(tThis.onPause)) {
                 tThis.go();//tThis in case `stop` turns public in future ver.
                 return;
             }
