@@ -25,7 +25,7 @@
  */
 /*jslint vars: true, passfail: false */
 /*global $ */
-var worldClass = function(worldMap) {
+var worldClass = function(initParams) {
     /**
      * Defines and updates a World, which consists on:
      * a grid of square-shaped cells on an html5 canvas, 
@@ -41,7 +41,9 @@ var worldClass = function(worldMap) {
     
     'use strict';
     var tThis = this;
-    var canvas=null, context=null, grid=null, cell=null;
+    initParams = initParams||{};
+    tThis.geinitParams = function (){return initParams;};
+    var canvas = null, context=null, grid=null, cell=null;
 
     this.setCell = function(){
         cell = {
@@ -49,7 +51,7 @@ var worldClass = function(worldMap) {
             height : canvas.height / grid.height
         };
     };
-    var setCanvas = function(c){
+    var setCCC = function(c){
         //some exception handling would be nice...
         canvas = c;
         canvas.width = c.width; //clears the canvas
@@ -57,18 +59,18 @@ var worldClass = function(worldMap) {
         tThis.setCell();
     };
     
-    if (worldMap ===  undefined){
-        grid = {
+    if (initParams.worldMap ===  undefined){
+        grid = initParams.grid||{
             width : 10,
             height : 20,
             content : [],
             dirty : []
         };
-        setCanvas($('#tcanvas')[0]);
+        setCCC(initParams.canvas||$('#tcanvas')[0]);
     } else {
         //some exception handling would be nice...
-        grid = worldMap.grid;
-        setCanvas(worldMap.canvas);
+        grid = initParams.worldMap.grid;
+        setCCC(initParams.worldMap.canvas);
     }
     for (var i=0;i<grid.width;i++){
         grid.content.push([]);
@@ -78,7 +80,9 @@ var worldClass = function(worldMap) {
             grid.dirty[i].push(false);
         }
     }
-    this.getGridParams = function(){ return {width: grid.width, height: grid.height}; };
+    this.getGridParams = function(){ 
+        return {width: grid.width, height: grid.height}; 
+    };
 
     this.isClear = function(x,y){
         if (y<0) return true; //over the top is always clear
@@ -108,9 +112,6 @@ var worldClass = function(worldMap) {
             grid.content[pos.x[i]][pos.y[i]] = fillColor;
             grid.dirty[pos.x[i]][pos.y[i]] = true;
         }
-        // context.strokeRect( pos.x[i], pos.y[i], cell.width,
-        // cell.height ); 
-        // (nothing but a reminder of the existence of strokeRect)
     };
     this.updateGridRows = function (fullRows){
         var stop = Math.max.apply(null,fullRows);
@@ -131,7 +132,10 @@ var worldClass = function(worldMap) {
         context.lineWidth = 1;
         for (var x=0;x<grid.width;x++){
             for (var y=0;y<=grid.height;y++){
-                if ((grid.content[x][y] !== undefined)&&(grid.dirty[x][y]||assumeDirty)){
+                if (
+                    (grid.content[x][y] !== undefined) &&
+                    (grid.dirty[x][y]||assumeDirty)
+                ){
                     var fComm;
                     if (grid.content[x][y] === 'clear'){
                         fComm = 'clearRect';
@@ -139,15 +143,31 @@ var worldClass = function(worldMap) {
                         fComm='fillRect';
                         context.fillStyle = grid.content[x][y];
                     }
-                    context[fComm](Math.round(x*cell.width), Math.round(y*cell.height), Math.round(cell.width), Math.round(cell.height));
+                    context[fComm](
+                        Math.round(x*cell.width), 
+                        Math.round(y*cell.height), 
+                        Math.round(cell.width), 
+                        Math.round(cell.height)
+                    );
+                    // context.strokeRect( pos.x[i], pos.y[i], cell.width,
+                    // cell.height ); 
+                    // (nothing but a reminder of the existence of strokeRect)
                     grid.dirty[x][y]=false;
                 }
             }
         }
     };
+    this.resize = function(cWidth, cHeight){
+        canvas.height=cHeight;
+        canvas.width=cWidth; 
+        canvas.style.height = cHeight+'px';
+        canvas.style.width  = cWidth+'px';
+        tThis.setCell();
+        tThis.redrawDirtyCells(true);
+    };
 };
 
-var tEngineClass = function(){
+var tEngineClass = function(initParams){
     /**
      * Defines and executes the game logic, determining and triggering the 
      * proper actions to take based on the current game state (scenario).
@@ -165,25 +185,36 @@ var tEngineClass = function(){
     'use strict';
 
     var tThis = this;
-    var tWorld = null;
+    initParams = initParams||{};
+    tThis.geinitParams = function (){return initParams;};
+    var tWorld = null; //to be set by tThis.start()
     this.getWorld = function(){ return tWorld; };
-    var actionsBuffer = [];
-    var tTromino = null;
-    var lines = null;
-    var points = null;
-    var level = null;
+    var actionsBuffer = initParams.actionsBuffer||[];
+    var tTromino = null; //ditto
+    var lines = null; //ditto
+    var points = null; //ditto
+    var startLevel = null; //ditto
+    var level = null; //ditto
+    var $lines = initParams.$lines||$('#lines');
+    var $score = initParams.$score||$('#score');
+    var $level = initParams.$level||$('#level');
     this.getLevel = function(){return level;};
-    var startLevel = 0;
-    var keyDownInterval = 200;
-    var keyDownIntervalIds = {
-        rotateLeft : undefined,
-        rotateRight : undefined,
-        moveLeft : undefined,
-        moveRight : undefined,
-        next : undefined,
-        pause : undefined
-    };
-    var actions = {
+    var $help = initParams.$help||$( "#dialog-message-help" );
+    var $gover = initParams.$gover||$( "#dialog-message-gover" );
+    var $win = initParams.$win||$('#win');
+    var $lose = initParams.$lose||$('#lose');
+    var $first = initParams.$first||$('#first');
+    var defaultStartLevel = initParams.defaultStartLevel||0;
+    var keyDownInterval = initParams.keyDownInterval||200;
+    var keyDownIntervalIds = initParams.keyDownIntervalIds||{
+            rotateLeft : undefined,
+            rotateRight : undefined,
+            moveLeft : undefined,
+            moveRight : undefined,
+            next : undefined,
+            pause : undefined
+        };
+    var actions = initParams.actions||{
         rotateLeft : keyValue('a'),
         rotateRight : keyValue('d'),
         moveLeft : keyValue('leftArrow'),
@@ -197,15 +228,18 @@ var tEngineClass = function(){
     var move = function() {
         tWorld.updateGridPos('clear',tTromino.getCurrentCoordinates());
         tTromino.updatePosition();
-        tWorld.updateGridPos(tTrominoClass.colors(tTromino.getType()),tTromino.getCurrentCoordinates());
+        tWorld.updateGridPos(
+            tTrominoClass.colors(tTromino.getType()),
+            tTromino.getCurrentCoordinates()
+        );
     };
     var isAvailable = function(pos){
         for (var j in pos.x){
             if ((!tWorld.isClear(pos.x[j],pos.y[j]) &&
                 !tTromino.isCurrent(pos.x[j],pos.y[j])) ||//(!free && !myself)
-                (pos.y[j]>=tWorld.getGridParams().height) || //|| overflow(down)
-                (pos.x[j]>=tWorld.getGridParams().width) || // || overflow(right)
-                (pos.x[j]<0)){                             //  || overflow(left)
+                (pos.y[j]>=tWorld.getGridParams().height) ||//|| overflow(down)
+                (pos.x[j]>=tWorld.getGridParams().width) ||//|| overflow(right)
+                (pos.x[j]<0)){                             //|| overflow(left)
                 return false;
             }
         }
@@ -252,9 +286,9 @@ var tEngineClass = function(){
         points+=fullRows.length*fullRows.length*(level+1)*100;
         level = startLevel + Math.floor(lines/10);
         
-        $('#level').text(level);
-        $('#lines').text(lines);
-        $('#score').text(points);
+        $level.text(level);
+        $lines.text(lines);
+        $score.text(points);
         
         var bOver = false; 
         var coords = tTromino.getCurrentCoordinates();
@@ -269,10 +303,12 @@ var tEngineClass = function(){
             tTromino.stop();
             actionsBuffer = [];
             tTromino = new tTrominoClass(
-                    Math.floor(tWorld.getGridParams().width / 2) - 1, 
-                    -1,
-                    tTrominoClass.types(Math.floor(Math.random() * 7)),
-                    0);
+                tThis,
+                Math.floor(tWorld.getGridParams().width / 2) - 1, 
+                -1,
+                tTrominoClass.types(Math.floor(Math.random() * 7)),
+                0
+            );
             coords = tTromino.getCurrentCoordinates();
             for ( var i = 0;i<coords.y.length;i++) {
                 if (coords.y[i]>=0&&!tWorld.isClear(coords.x[i],coords.y[i])){
@@ -306,39 +342,74 @@ var tEngineClass = function(){
             p.x+=v[0];
             p.y+=v[1];
             var r = tTromino.getRotation(v[2]);
-            
-            if (action === 'moveDown') {
-                if (getBorder(tTrominoClass.getCoordinates(t,{x:p.x,y:p.y+1},r)).distance>=0){
-                    tTromino.vector[1]++;
-                } else {
-                    resolve();
-                }
-            } else if (action === 'moveLeft') {
-                if (getBorder(tTrominoClass.getCoordinates(t,{x:p.x-1,y:p.y},r)).distance>=0){
-                    tTromino.vector[0]--;
-                }
-            } else if (action === 'moveRight') {
-                if (getBorder(tTrominoClass.getCoordinates(t,{x:p.x+1,y:p.y},r)).distance>=0){
-                    tTromino.vector[0]++;
-                }
-            } else if (action === 'rotateLeft') {
-                if (getBorder(tTrominoClass.getCoordinates(t,p,(r+l-1)%l)).distance>=0){
-                    tTromino.vector[2]--;
-                }
-            } else if (action === 'rotateRight') {
-                if (getBorder(tTrominoClass.getCoordinates(t,p,(r+1)%l)).distance>=0){
-                    tTromino.vector[2]++;
-                }
-            } else if (action === 'drop') {
-                tTromino.vector[1]+=(getBorder(tTrominoClass.getCoordinates(t,{x:p.x,y:p.y},r)).distance);
-            } else if (action === 'pause') {
-                stop();
-                return;
-            } else if (action === 'help') {
-                stop();
-                $( "#dialog-message-help" ).dialog( "open" );
-                return;
-            } else return; 
+            switch (action) {
+                case 'moveDown' :
+                    if (
+                        getBorder(
+                            tTrominoClass.getCoordinates(t,{x:p.x,y:p.y+1},r)
+                        ).distance>=0
+                    ) {
+                        tTromino.vector[1]++;
+                    } else {
+                        resolve();
+                    }
+                    break;
+                case 'moveLeft' :
+                    if (
+                        getBorder(
+                            tTrominoClass.getCoordinates(t,{x:p.x-1,y:p.y},r)
+                        ).distance>=0
+                    ) {
+                        tTromino.vector[0]--;
+                    }
+                    break;
+                case  'moveRight':
+                    if (
+                        getBorder(
+                            tTrominoClass.getCoordinates(t,{x:p.x+1,y:p.y},r)
+                        ).distance>=0
+                    ) {
+                        tTromino.vector[0]++;
+                    }
+                    break;
+                case  'rotateLeft':
+                    if (
+                        getBorder(
+                            tTrominoClass.getCoordinates(t,p,(r+l-1)%l)
+                        ).distance>=0
+                    ) {
+                        tTromino.vector[2]--;
+                    }
+                    break;
+                case  'rotateRight':
+                    if (
+                        getBorder(
+                            tTrominoClass.getCoordinates(t,p,(r+1)%l)
+                        ).distance>=0
+                    ) {
+                        tTromino.vector[2]++;
+                    }
+                    break;
+                case  'drop':
+                    tTromino.vector[1]+=(
+                        getBorder(
+                            tTrominoClass.getCoordinates(t,{x:p.x,y:p.y},r)
+                        ).distance
+                    );
+                    break;
+                case  'pause':
+                    stop();
+                    return;
+                case  'help':
+                    stop();
+                    $help.dialog( "open" );
+                    return;
+                default :
+                    console.log(
+                        "No handler found for action `" + action + "`."
+                    );
+                    return;
+            }
         }
         move();
         tWorld.redrawDirtyCells();
@@ -374,19 +445,29 @@ var tEngineClass = function(){
         clearInterval(keyDownIntervalIds[command[0]]);
         keyDownIntervalIds[command[0]] = undefined;
     };
-    this.start = function(){
-        tWorld = new worldClass();
-        tTromino = new tTrominoClass(
-            Math.floor(tWorld.getGridParams().width / 2) - 1, 
-            -1,
-            tTrominoClass.types(Math.floor(Math.random() * 7)),
-        0);
-        lines = 0;
-        points = 0;
-        level = startLevel;
-        $('#level').text(level);
-        $('#lines').text(lines);
-        $('#score').text(points);
+    this.start = function(initParams){
+        initParams = initParams||{};
+        tWorld = initParams.tWorld?
+            initParams.tWorld:
+            initParams.tWorldInitParams?
+                new worldClass(initParams.tWorldInitParams):
+                new worldClass();
+        tTromino = initParams.tTrominoInitParams?
+            new tTrominoClass(tThis, initParams.tTrominoInitParams):
+            new tTrominoClass(
+                tThis,
+                Math.floor(tWorld.getGridParams().width / 2) - 1, 
+                -1,
+                tTrominoClass.types(Math.floor(Math.random() * 7)),
+                0
+            );
+        lines = initParams.lines||0;
+        points = initParams.points||0;
+        startLevel = initParams.startLevel||defaultStartLevel;
+        level = initParams.level||startLevel;
+        $level.text(level);
+        $lines.text(lines);
+        $score.text(points);
         tThis.go();
     };
     this.go = function() {
@@ -406,7 +487,7 @@ var tEngineClass = function(){
                 return actions[key] === event.which;
             });
             if (command[0] === 'pause') {
-                tThis.go();//tThis in case `stop` turns public in future versions
+                tThis.go();//tThis in case `stop` turns public in future ver.
                 return;
             }
         });
@@ -415,23 +496,23 @@ var tEngineClass = function(){
         stop();
         $('.yourscore').text(points);
         if(localStorage.getItem('tetrominos-highscore')) {
-            $('#first').hide();
+            $first.hide();
             $('.highscore').text(localStorage.getItem('tetrominos-highscore'));
             if (points > localStorage.getItem('tetrominos-highscore')){ 
-                $('#lose').hide();
-                $('#win').show();
+                $lose.hide();
+                $win.show();
                 localStorage.setItem('tetrominos-highscore', points);
             } else {
-                $('#win').hide();
-                $('#lose').show();
+                $win.hide();
+                $lose.show();
             }
         } else {
-            $('#win').hide();
-            $('#lose').hide();
-            $('#first').show();
+            $win.hide();
+            $lose.hide();
+            $first.show();
             localStorage.setItem('tetrominos-highscore', points);
         }
-        $( "#dialog-message-gover" ).dialog( "open" );
+        $gover.dialog("open");
     };
     function keyValue(key){
         var keys = {
@@ -448,10 +529,30 @@ var tEngineClass = function(){
         };
         return keys[key];
     };
+    $help.dialog({
+        autoOpen: false,
+        modal: true,
+        buttons: {
+            Ok: function() {
+                $(this).dialog( "close" );
+            }
+        },
+        close: function(event, ui) { tThis.go(); }
+    });
+    $gover.dialog({
+        autoOpen: false,
+        modal: true,
+        buttons: {
+            Ok: function() {
+                $(this).dialog( "close" );
+            }
+        },
+        close: function(event, ui) { tThis.start(); }
+    });
 };
 
 
-var tTrominoClass = function(positionX,positionY,tType,rot) {
+var tTrominoClass = function(engine, positionX,positionY,tType,rot) {
     /**
      * Defines a tetromino-shaped entity the player can interact with by 
      * rotating it left or right or moving it sideways or downwards one cell 
@@ -466,6 +567,7 @@ var tTrominoClass = function(positionX,positionY,tType,rot) {
     'use strict';
     
     var tThis = this;
+    var engine = tEngine;
     var position = (positionX===undefined||positionY===undefined)?{
         x : 0,
         y : 0
@@ -473,7 +575,9 @@ var tTrominoClass = function(positionX,positionY,tType,rot) {
         x:positionX,
         y:positionY
     };
-    var type = (tType===undefined)?this.types(Math.floor(Math.random() * 7)):tType;
+    var type = (tType===undefined)?
+        this.types(Math.floor(Math.random() * 7)):
+        tType;
     var rotation = (rot===undefined)?0:rot;
     var fallIntervalId = undefined;
     this.fallInterval = 1000;
@@ -500,11 +604,11 @@ var tTrominoClass = function(positionX,positionY,tType,rot) {
     };
     this.go = function(){
         fallIntervalId=setInterval(
-            function(){tEngine.pushAction('moveDown');},
+            function(){engine.pushAction('moveDown');},
             Math.ceil(
                 1000/(
                     1000/tThis.fallInterval
-                   +(500*tEngine.getLevel()/tThis.fallInterval)
+                   +(500*engine.getLevel()/tThis.fallInterval)
                 )
             )
         );
@@ -578,26 +682,6 @@ tTrominoClass.types = function (index){
 $(document).ready(function() {
     tEngine = new tEngineClass();
     tEngine.start();
-    $( "#dialog-message-help" ).dialog({
-        autoOpen: false,
-        modal: true,
-        buttons: {
-            Ok: function() {
-                $( this ).dialog( "close" );
-            }
-        },
-        close: function(event, ui) { tEngine.go(); }
-    });
-    $( "#dialog-message-gover" ).dialog({
-        autoOpen: false,
-        modal: true,
-        buttons: {
-            Ok: function() {
-                $( this ).dialog( "close" );
-            }
-        },
-        close: function(event, ui) { tEngine.start(); }
-    });
     $(window).resize(function() {
         var wWidth = 0.85*$(window).width();
         var wHeight = 0.85*$(window).height();
@@ -620,12 +704,7 @@ $(document).ready(function() {
         $('.display').css('font-size', 0.04*tHeight + 'px');
         $('p').css('font-size', 0.03*tHeight + 'px');
         $('h1').css('font-size', 0.06*tHeight + 'px');
-        canvas.height=cHeight;
-        canvas.width=cWidth; 
-        canvas.style.height = cHeight+'px';
-        canvas.style.width  = cWidth+'px';
-        tEngine.getWorld().setCell();
-        tEngine.getWorld().redrawDirtyCells(true);
+        tEngine.getWorld().resize(cWidth, cHeight);
     });
     $(window).resize();
     //var fps = 0;
