@@ -3,9 +3,7 @@
  * Copyright (C) 2013 Gael Abadin
  * 
  * TODO:
- * 
- * Fit window and resize on window resize.
- * 
+ *  
  * Menu: 
  *  -Select start level
  *  -High scores chart
@@ -45,12 +43,10 @@ var worldClass = function(worldMap) {
     var tThis = this;
     var canvas=null, context=null, grid=null, cell=null;
 
-    var setCell = function(){
+    this.setCell = function(){
         cell = {
-            width : Math.floor(canvas.width
-                    / grid.width),
-            height : Math.floor(canvas.height
-                    / grid.height)
+            width : canvas.width / grid.width,
+            height : canvas.height / grid.height
         };
     };
     var setCanvas = function(c){
@@ -58,7 +54,7 @@ var worldClass = function(worldMap) {
         canvas = c;
         canvas.width = c.width; //clears the canvas
         context = canvas.getContext('2d');
-        setCell();
+        tThis.setCell();
     };
     
     if (worldMap ===  undefined){
@@ -130,11 +126,12 @@ var worldClass = function(worldMap) {
             }
         }
     };
-    this.redrawDirtyCells = function(){
+    this.redrawDirtyCells = function(assumeDirty){
+        if (assumeDirty===undefined) { assumeDirty = false; }
         context.lineWidth = 1;
         for (var x=0;x<grid.width;x++){
             for (var y=0;y<=grid.height;y++){
-                if ((grid.content[x][y] !== undefined)&&grid.dirty[x][y]===true){
+                if ((grid.content[x][y] !== undefined)&&(grid.dirty[x][y]||assumeDirty)){
                     var fComm;
                     if (grid.content[x][y] === 'clear'){
                         fComm = 'clearRect';
@@ -142,7 +139,7 @@ var worldClass = function(worldMap) {
                         fComm='fillRect';
                         context.fillStyle = grid.content[x][y];
                     }
-                    context[fComm](x*cell.width, y*cell.height, cell.width, cell.height);
+                    context[fComm](Math.round(x*cell.width), Math.round(y*cell.height), Math.round(cell.width), Math.round(cell.height));
                     grid.dirty[x][y]=false;
                 }
             }
@@ -169,6 +166,7 @@ var tEngineClass = function(){
 
     var tThis = this;
     var tWorld = null;
+    this.getWorld = function(){ return tWorld; };
     var actionsBuffer = [];
     var tTromino = null;
     var lines = null;
@@ -600,6 +598,36 @@ $(document).ready(function() {
         },
         close: function(event, ui) { tEngine.start(); }
     });
+    $(window).resize(function() {
+        var wWidth = 0.85*$(window).width();
+        var wHeight = 0.85*$(window).height();
+        var tHeight = Math.min(2*wWidth, wHeight);
+        tHeight -= (((0.85*tHeight)%20)/0.85);
+        var hHeight = 0.05*tHeight;
+        var cHeight = 0.85*tHeight;
+        var cWidth = cHeight/2;
+        var tWidth = 2*cWidth+2; 
+        var fHeight = 0.10 * tHeight;
+        var canvas = document.getElementById('tcanvas');
+        
+        $('#game').height(cHeight);
+        $('#game').width(tWidth);
+        $('#board').height(cHeight);
+        $('#board').width(cWidth);
+        $('#panel').height(cHeight);
+        $('#panel').width(cWidth);
+        $('.display').css('margin-top', 0.17*tHeight + 'px');
+        $('.display').css('font-size', 0.04*tHeight + 'px');
+        $('p').css('font-size', 0.03*tHeight + 'px');
+        $('h1').css('font-size', 0.06*tHeight + 'px');
+        canvas.height=cHeight;
+        canvas.width=cWidth; 
+        canvas.style.height = cHeight+'px';
+        canvas.style.width  = cWidth+'px';
+        tEngine.getWorld().setCell();
+        tEngine.getWorld().redrawDirtyCells(true);
+    });
+    $(window).resize();
     //var fps = 0;
     //setInterval(function(){fps++;},0);
     //setInterval(function(){console.log("fps: "+fps);fps=0;},1000);
