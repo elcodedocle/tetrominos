@@ -3,17 +3,9 @@ body {
     background: #eee;
     text-align: center
 }
-p {
-    font-size: 2.5vh;
-}
-h1 {
-    font-size: 5vh;
-}
 #tcanvas {
     background-image: url(kitty_bg.jpg);
     background-size: 100%;
-    width: 100%;
-    height: 100%;
 }
 #dialog-message-help {
     text-align: left;
@@ -21,28 +13,20 @@ h1 {
 #game {
     background: #fff;
     border: 1px solid #ccc;
-    height: 70vh;
-    width: 70.2vh;
     margin: auto;
 }
 #board {
     background: #fff;
-    width: 35vh;
-    height: 70vh;
     float: left;
 }
 #panel {
     background: #333;
     color: #09c;
-    border-left: 0.1vh solid #ccc;
-    width: 35vh;
-    height: 70vh;
+    border-left: solid #ccc;
     float: right;
 }
 .display {
     font-family: "Roboto", sans-serif;
-    font-size: 4vh;
-    margin-top: 17vh;
     color: #3cf;
 }
 
