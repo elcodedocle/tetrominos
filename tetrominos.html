@@ -7,8 +7,8 @@
     <head>
         <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
         <title>Tetrominos - html5 *etris clone from scratch.</title>
-        <link href="tstyle.css" rel="stylesheet" type="text/css">
         <link rel="stylesheet" href="http://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css" />
+        <link href="tstyle.css" rel="stylesheet" type="text/css">
         <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
         <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
         <script type="text/javascript" src="fallingTetrominos3.js"></script>
@@ -57,13 +57,21 @@
             <p>
                 Key map:
             </p>
-            <p style="padding-left:2em;">
-                left/right/down arrow : move left/right/down<br />
-                a,d : rotate left/right<br />
+            <p style="padding-left:1em;">
+                a/d : rotate left/right<br />
+                &larr;/&rarr; : move left/right<br />
+                &darr; : move down<br /> 
                 spacebar : dump the piece<br />
                 p : pause/continue<br />
                 h : this help<br />
+                +/- : inc./dec. replay speed
             </p>
+        </div>
+        <div id="dialog-message-pause" title="Paused">
+            <p>
+                Game paused
+            </p>
+            <p>Press `p` to resume</p>
         </div>
         <div id="dialog-message-gover" title="Game over">
             <p>

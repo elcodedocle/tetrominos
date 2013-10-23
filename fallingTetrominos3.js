@@ -187,6 +187,17 @@ var tEngineClass = function(initParams){
     var tThis = this;
     initParams = initParams||{};
     tThis.geinitParams = function (){return initParams;};
+    var replay = initParams.replay||false;
+    this.isReplay = function(){return replay;}; 
+    var tetrominosRecord = initParams.tetrominosRecord||[];
+    var actionBuffersRecord = initParams.actionBuffersRecord||[];
+    var processIntervalsRecord = initParams.processIntervalsRecord||[];
+    var tempTetrominosRecord = initParams.tempTetrominosRecord||[];
+    var tempActionBuffersRecord = initParams.tempActionBuffersRecord||[];
+    var tempProcessIntervalsRecord = initParams.tempProcessIntervalsRecord||[];
+    var replaySpeed = initParams.replaySpeed||1;
+    var replayIntervalId;
+    var lastProcessTimeStamp = null;
     var tWorld = initParams.tWorld||null; 
     this.getWorld = function(){ return tWorld; };
     var actionsBuffer = initParams.actionsBuffer||[];
@@ -200,6 +211,7 @@ var tEngineClass = function(initParams){
     var $level = initParams.$level||$('#level');
     this.getLevel = function(){return level;};
     var $help = initParams.$help||$( "#dialog-message-help" );
+    var $pause = initParams.$help||$( "#dialog-message-pause" );
     var onPause = initParams.onPause||null;
     var $gover = initParams.$gover||$( "#dialog-message-gover" );
     var $win = initParams.$win||$('#win');
@@ -301,14 +313,27 @@ var tEngineClass = function(initParams){
             }
         }
         if (!bOver){
+            var tInitParams;
             tTromino.stop();
             actionsBuffer = [];
+            if (!replay){
+                tInitParams = {
+                    x:Math.floor(tWorld.getGridParams().width / 2) - 1, 
+                    y:-1,
+                    t:tTrominoClass.types(Math.floor(Math.random() * 7)),
+                    r:0
+                };
+                tetrominosRecord.push(tInitParams);
+            } else {
+                tInitParams = tetrominosRecord.shift();
+                tempTetrominosRecord.push(tInitParams);
+            }
             tTromino = new tTrominoClass(
                 tThis,
-                Math.floor(tWorld.getGridParams().width / 2) - 1, 
-                -1,
-                tTrominoClass.types(Math.floor(Math.random() * 7)),
-                0
+                tInitParams.x,
+                tInitParams.y,
+                tInitParams.t,
+                tInitParams.r
             );
             coords = tTromino.getCurrentCoordinates();
             for ( var i = 0;i<coords.y.length;i++) {
@@ -333,110 +358,156 @@ var tEngineClass = function(initParams){
     };
     var process = function() {
         var action;
+        console.log(processIntervalsRecord);
         if (actionsBuffer===undefined){
             return;
-        } else while ((action = actionsBuffer.shift())!==undefined){
-            var t = tTromino.getType();
-            var l = tTrominoClass.rotations(t).length;
-            var v = tTromino.vector;
-            var p = tTromino.getPosition();
-            p.x+=v[0];
-            p.y+=v[1];
-            var r = tTromino.getRotation(v[2]);
-            switch (action) {
-                case 'moveDown' :
-                    if (
-                        getBorder(
-                            tTrominoClass.getCoordinates(t,{x:p.x,y:p.y+1},r)
-                        ).distance>=0
-                    ) {
-                        tTromino.vector[1]++;
-                    } else {
-                        resolve();
-                    }
-                    break;
-                case 'moveLeft' :
-                    if (
-                        getBorder(
-                            tTrominoClass.getCoordinates(t,{x:p.x-1,y:p.y},r)
-                        ).distance>=0
-                    ) {
-                        tTromino.vector[0]--;
-                    }
-                    break;
-                case  'moveRight':
-                    if (
-                        getBorder(
-                            tTrominoClass.getCoordinates(t,{x:p.x+1,y:p.y},r)
-                        ).distance>=0
-                    ) {
-                        tTromino.vector[0]++;
-                    }
-                    break;
-                case  'rotateLeft':
-                    if (
-                        getBorder(
-                            tTrominoClass.getCoordinates(t,p,(r+l-1)%l)
-                        ).distance>=0
-                    ) {
-                        tTromino.vector[2]--;
-                    }
-                    break;
-                case  'rotateRight':
-                    if (
-                        getBorder(
-                            tTrominoClass.getCoordinates(t,p,(r+1)%l)
-                        ).distance>=0
-                    ) {
-                        tTromino.vector[2]++;
-                    }
-                    break;
-                case  'drop':
-                    tTromino.vector[1]+=(
-                        getBorder(
-                            tTrominoClass.getCoordinates(t,{x:p.x,y:p.y},r)
-                        ).distance
-                    );
-                    break;
-                case  'pause':
-                    tThis.onPause = true;
-                    stop();
-                    return;
-                case  'help':
-                    stop();
-                    $help.dialog( "open" );
-                    return;
-                default :
-                    console.log(
-                        "No handler found for action `" + action + "`."
-                    );
-                    return;
+        } else {
+            if (!replay) { 
+                actionBuffersRecord.push(actionsBuffer.slice(0));
+                var now = new Date().getTime();
+                var processInterval = now - lastProcessTimeStamp;
+                lastProcessTimeStamp = now;
+                processIntervalsRecord.push(processInterval);
+            }
+            while ((action = actionsBuffer.shift())!==undefined){
+                var t = tTromino.getType();
+                var l = tTrominoClass.rotations(t).length;
+                var v = tTromino.vector;
+                var p = tTromino.getPosition();
+                p.x+=v[0];
+                p.y+=v[1];
+                var r = tTromino.getRotation(v[2]);
+                switch (action) {
+                    case 'moveDown' :
+                        if (
+                            getBorder(
+                                tTrominoClass.getCoordinates(
+                                    t,
+                                    {x:p.x,y:p.y+1},
+                                    r
+                                )
+                            ).distance>=0
+                        ) {
+                            tTromino.vector[1]++;
+                        } else {
+                            resolve();
+                        }
+                        break;
+                    case 'moveLeft' :
+                        if (
+                            getBorder(
+                                tTrominoClass.getCoordinates(
+                                    t,
+                                    {x:p.x-1,y:p.y},
+                                    r
+                                )
+                            ).distance>=0
+                        ) {
+                            tTromino.vector[0]--;
+                        }
+                        break;
+                    case 'moveRight':
+                        if (
+                            getBorder(
+                                tTrominoClass.getCoordinates(
+                                    t,
+                                    {x:p.x+1,y:p.y},
+                                    r
+                                )
+                            ).distance>=0
+                        ) {
+                            tTromino.vector[0]++;
+                        }
+                        break;
+                    case 'rotateLeft':
+                        if (
+                            getBorder(
+                                tTrominoClass.getCoordinates(t,p,(r+l-1)%l)
+                            ).distance>=0
+                        ) {
+                            tTromino.vector[2]--;
+                        }
+                        break;
+                    case 'rotateRight':
+                        if (
+                            getBorder(
+                                tTrominoClass.getCoordinates(t,p,(r+1)%l)
+                            ).distance>=0
+                        ) {
+                            tTromino.vector[2]++;
+                        }
+                        break;
+                    case 'drop':
+                        tTromino.vector[1]+=(
+                            getBorder(
+                                tTrominoClass.getCoordinates(t,{x:p.x,y:p.y},r)
+                            ).distance
+                        );
+                        break;
+                    case 'pause':
+                        tThis.onPause = true;
+                        $pause.dialog("open");
+                        stop();
+                        return;
+                    case 'help':
+                        stop();
+                        $help.dialog( "open" );
+                        return;
+                    default :
+                        console.log(
+                            "No handler found for action `" + action + "`."
+                        );
+                        return;
+                }
             }
         }
         move();
         tWorld.redrawDirtyCells();
+        if (replay) {processActionsRecord();}
     };
     var keyDown = function(event) {
 
         var command = Object.keys(actions).filter(function(key) {
             return actions[key] === event.which;
         });
-        if (command[0] !== undefined) {
-            var interval = keyDownInterval;
-            if (command[0] === 'moveLeft' || command[0] === 'moveRight'){
-                interval = Math.min(keyDownInterval, Math.max(Math.ceil(1000/
-                    (1000/tTromino.fallInterval
-                   +(500*tEngine.getLevel()/tTromino.fallInterval)
-                )),100));
+        if (!replay){
+            if (command[0] !== undefined) {
+                var interval = keyDownInterval;
+                if (command[0] === 'moveLeft' || command[0] === 'moveRight'){
+                    interval = Math.min(
+                        keyDownInterval, 
+                        Math.max(
+                            Math.ceil(
+                                1000/(
+                                    1000/tTromino.fallInterval
+                                  + 500*tEngine.getLevel()/tTromino.fallInterval
+                                )
+                            ),
+                            100
+                        )
+                    );
+                }
+                if (keyDownIntervalIds[command[0]] === undefined) {
+                    tThis.pushAction(command[0]);
+                    keyDownIntervalIds[command[0]] = setInterval(
+                        function() {
+                            tThis.pushAction(command[0]);
+                        }, 
+                        interval
+                    );
+                }
             }
-            if (keyDownIntervalIds[command[0]] === undefined) {
-                tThis.pushAction(command[0]);
-                keyDownIntervalIds[command[0]] = setInterval(
-                    function() {
-                        tThis.pushAction(command[0]);
-                    }, 
-                    interval
-                );
+        } else {
+            if (command[0] === 'pause') {
+                onPause = true;
+                $pause.dialog("open");
+                stop();
+            } else {
+                if (event.which === 107||event.which===187){
+                    replaySpeed = Math.min(replaySpeed*2,32);
+                } else if (event.which === 109||event.which===189){
+                    replaySpeed = Math.max(replaySpeed/2,0.0625);
+                }
             }
         }
     };
@@ -454,15 +525,34 @@ var tEngineClass = function(initParams){
             sIParams.tWorldInitParams?
                 new worldClass(sIParams.tWorldInitParams):
                 new worldClass();
-        tTromino = sIParams.tTrominoInitParams?
-            new tTrominoClass(tThis, sIParams.tTrominoInitParams):
-            new tTrominoClass(
-                tThis,
-                Math.floor(tWorld.getGridParams().width / 2) - 1, 
-                -1,
-                tTrominoClass.types(Math.floor(Math.random() * 7)),
-                0
-            );
+        actionsBuffer = sIParams.actionsBuffer||[];
+        tempTetrominosRecord = sIParams.tempTetrominosRecord||[];
+        tempActionBuffersRecord = sIParams.tempActionBuffersRecord||[];
+        tempProcessIntervalsRecord = sIParams.tempProcessIntervalsRecord||[];
+        var tInitParams;
+        if (!replay){
+            tetrominosRecord = sIParams.tetrominosRecord||[];
+            actionBuffersRecord = sIParams.actionBuffersRecord||[];
+            processIntervalsRecord = sIParams.processIntervalsRecord||[];
+            tInitParams = sIParams.tTrominoInitParams||{
+                x:Math.floor(tWorld.getGridParams().width / 2) - 1, 
+                y:-1,
+                t:tTrominoClass.types(Math.floor(Math.random() * 7)),
+                r:0
+            };
+            tetrominosRecord.push(tInitParams);
+        } else {
+            replaySpeed = 1;
+            tInitParams = tetrominosRecord.shift();
+            tempTetrominosRecord.push(tInitParams);
+        }
+        tTromino = new tTrominoClass(
+            tThis,
+            tInitParams.x,
+            tInitParams.y,
+            tInitParams.t,
+            tInitParams.r
+        );
         lines = sIParams.lines||0;
         points = sIParams.points||0;
         startLevel = sIParams.startLevel||defaultStartLevel;
@@ -472,25 +562,44 @@ var tEngineClass = function(initParams){
         $score.text(points);
         tThis.go();
     };
+    var processActionsRecord = function(){
+        actionsBuffer = actionBuffersRecord.shift();
+        if (actionsBuffer){
+            tempActionBuffersRecord.push(actionsBuffer.slice(0));
+            var processInterval = processIntervalsRecord.shift();
+            tempProcessIntervalsRecord.push(processInterval);
+            replayIntervalId = setTimeout(
+                process, 
+                processInterval/Math.min(Math.max(replaySpeed,0.0625),32)
+            );
+        } 
+    };
     this.go = function() {
         tThis.onPause = false;
         $(window).unbind('keydown');
         $(window).keydown(keyDown);
         $(window).keyup(keyUp);
         tTromino.go();
+        lastProcessTimeStamp = new Date().getTime();
+        process();
+        if (tThis.replay) { processActionsRecord(); }
     };
     var stop = function() {
         tTromino.stop();
         $(window).unbind('keydown');
-        for (var i in keyDownIntervalIds) {
-            clearInterval(keyDownIntervalIds[i]);
-        }
+        if (!replay){
+            for (var i in keyDownIntervalIds) {
+                clearInterval(keyDownIntervalIds[i]);
+            }
+        } else {
+            clearInterval(replayIntervalId);
+        }    
         $(window).keydown(function(event) {
             var command = Object.keys(actions).filter(function(key) {
                 return actions[key] === event.which;
             });
             if ((command[0] === 'pause')&&(tThis.onPause)) {
-                tThis.go();//tThis in case `stop` turns public in future ver.
+                $pause.dialog("close");
                 return;
             }
         });
@@ -504,7 +613,7 @@ var tEngineClass = function(initParams){
             if (points > localStorage.getItem('tetrominos-highscore')){ 
                 $lose.hide();
                 $win.show();
-                localStorage.setItem('tetrominos-highscore', points);
+                if (!replay) localStorage.setItem('tetrominos-highscore', points);
             } else {
                 $win.hide();
                 $lose.show();
@@ -513,7 +622,7 @@ var tEngineClass = function(initParams){
             $win.hide();
             $lose.hide();
             $first.show();
-            localStorage.setItem('tetrominos-highscore', points);
+            if (!replay) localStorage.setItem('tetrominos-highscore', points);
         }
         $gover.dialog("open");
     };
@@ -542,11 +651,31 @@ var tEngineClass = function(initParams){
         },
         close: function(event, ui) { tThis.go(); }
     });
-    $gover.dialog({
+    $pause.dialog({
         autoOpen: false,
         modal: true,
         buttons: {
             Ok: function() {
+                $(this).dialog( "close" );
+            }
+        },
+        close: function(event, ui) { onPause=false; tThis.go(); }
+    });
+    $gover.dialog({
+        autoOpen: false,
+        modal: true,
+        buttons: {
+            "Replay": function() {
+                if (replay){
+                    actionBuffersRecord = tempActionBuffersRecord.slice(0);
+                    tetrominosRecord = tempTetrominosRecord.slice(0);
+                    processIntervalsRecord = tempProcessIntervalsRecord.slice(0);
+                }
+                replay=true;
+                $(this).dialog( "close" );
+            },
+            Ok: function() {
+                replay=false;
                 $(this).dialog( "close" );
             }
         },
@@ -606,18 +735,20 @@ var tTrominoClass = function(engine, positionX,positionY,tType,rot) {
         return false;
     };
     this.go = function(){
-        fallIntervalId=setInterval(
-            function(){engine.pushAction('moveDown');},
-            Math.ceil(
-                1000/(
-                    1000/tThis.fallInterval
-                   +(500*engine.getLevel()/tThis.fallInterval)
+        if (!engine.isReplay()) {
+            fallIntervalId=setInterval(
+                function(){engine.pushAction('moveDown');},
+                Math.ceil(
+                    1000/(
+                        1000/tThis.fallInterval
+                       +(500*engine.getLevel()/tThis.fallInterval)
+                    )
                 )
-            )
-        );
+            );
+        }
     };
     this.stop = function(){
-        clearInterval(fallIntervalId);
+        if (!engine.isReplay()) {clearInterval(fallIntervalId);}
     };
     this.updatePosition = function(){
         position.x += tThis.vector[0];
@@ -706,6 +837,7 @@ $(document).ready(function() {
         $('.display').css('margin-top', 0.17*tHeight + 'px');
         $('.display').css('font-size', 0.04*tHeight + 'px');
         $('p').css('font-size', 0.03*tHeight + 'px');
+        $('#dialog-message-help p').css('font-size', 0.025*tHeight + 'px');
         $('h1').css('font-size', 0.06*tHeight + 'px');
         tEngine.getWorld().resize(cWidth, cHeight);
     });
