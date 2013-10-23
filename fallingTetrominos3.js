@@ -358,7 +358,6 @@ var tEngineClass = function(initParams){
     };
     var process = function() {
         var action;
-        console.log(processIntervalsRecord);
         if (actionsBuffer===undefined){
             return;
         } else {
