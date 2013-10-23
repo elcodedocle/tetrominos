@@ -823,7 +823,7 @@ $(document).ready(function() {
         var hHeight = 0.05*tHeight;
         var cHeight = 0.85*tHeight;
         var cWidth = cHeight/2;
-        var tWidth = 2*cWidth+2; 
+        var tWidth = 2*cWidth+0.003*tHeight; 
         var fHeight = 0.10 * tHeight;
         var canvas = document.getElementById('tcanvas');
         
@@ -833,6 +833,7 @@ $(document).ready(function() {
         $('#board').width(cWidth);
         $('#panel').height(cHeight);
         $('#panel').width(cWidth);
+        $('#panel').css('border-left-width', 0.003*tHeight + 'px');
         $('.display').css('margin-top', 0.17*tHeight + 'px');
         $('.display').css('font-size', 0.04*tHeight + 'px');
         $('p').css('font-size', 0.03*tHeight + 'px');
