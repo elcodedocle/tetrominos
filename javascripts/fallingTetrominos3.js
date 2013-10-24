@@ -52,9 +52,6 @@ var worldClass = function(initParams) {
         width: 100,
         height: 100
     });
-    this.setBGImage = function(imageObj){
-        bgImage.setImage(imageObj);
-    };
     var stage = new Kinetic.Stage(initParams.stage||{
         container: 'board'
     });
@@ -63,7 +60,12 @@ var worldClass = function(initParams) {
     var fullBoard = initParams.fullBoard||false;
     this.getFullBoard = function(){return fullBoard;};
     var layer = initParams.layer||new Kinetic.Layer();
-    layer.add(bgImage);
+    this.setBGImage = function(imageObj){
+        bgImage.setSize(layer.getSize());
+        bgImage.setImage(imageObj);
+        layer.add(bgImage);
+        $(window).resize();
+    };
     var bigButton = new Kinetic.Rect({
         opacity: 0,
         x: 0,
