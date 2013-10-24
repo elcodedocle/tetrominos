@@ -24,7 +24,7 @@
  * 
  */
 /*jslint vars: true, passfail: false */
-/*global $ */
+/*global $, Kinetic */
 var worldClass = function(initParams) {
     /**
      * Defines and updates a World, which consists on:
@@ -43,14 +43,90 @@ var worldClass = function(initParams) {
     var tThis = this;
     initParams = initParams||{};
     tThis.geinitParams = function (){return initParams;};
+    var tEngine = initParams.tEngine;
     var canvas=null, context=null, grid=null, cell=null;
-
+    var bgImage=new Kinetic.Image({
+        x: 0,
+        y: 0,
+        image: new Image(),
+        width: 100,
+        height: 100
+    });
+    this.setBGImage = function(imageObj){
+        bgImage.setImage(imageObj);
+    };
+    var stage = new Kinetic.Stage(initParams.stage||{
+        container: 'board'
+    });
+    var touch = initParams.touch||{};
+    var itsATap = initParams.touch||false;
+    var fullBoard = initParams.fullBoard||false;
+    this.getFullBoard = function(){return fullBoard;};
+    var layer = initParams.layer||new Kinetic.Layer();
+    layer.add(bgImage);
+    var bigButton = new Kinetic.Rect({
+        opacity: 0,
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100
+    });
+    layer.add(bigButton);
+    stage.add(layer);
     this.setCell = function(){
         cell = {
             width : canvas.width / grid.width,
             height : canvas.height / grid.height
         };
     };
+    var text = new Kinetic.Text({
+        x: 10,
+        y: 10,
+        fontFamily: 'Roboto',
+        fontSize: $('p').css('font-size'),
+        text: '',
+        fill: 'black'
+    });
+    layer.add(text);
+    this.writeMessage = function(message) {
+        text.setText(message);
+        //layer.draw();
+    };
+    bigButton.on('tap', function(evt) {
+        evt.cancelBubble = true;
+        if (itsATap){ 
+            tEngine.pushAction('rotateLeft'); 
+            if (!fullBoard){
+                fullBoard=true;
+                $(window).resize();
+            }
+        }
+    });
+    bigButton.on('touchstart', function(evt) {
+        evt.cancelBubble = true;
+        itsATap = true;
+        touch=stage.getTouchPosition();
+    });
+    bigButton.on('touchmove', function(evt) {
+        evt.cancelBubble = true;
+        itsATap = false;
+        var touchPos = stage.getTouchPosition();
+        if (touch.x>touchPos.x){
+            for (var i =0; i<Math.floor(touch.x/cell.width)-Math.floor(touchPos.x/cell.width); i++){
+                tEngine.pushAction('moveLeft');
+            }
+        } else {
+            for (var i =0; i<Math.floor(touchPos.x/cell.width)-Math.floor(touch.x/cell.width); i++){
+                tEngine.pushAction('moveRight');
+            }
+        }
+        if (touchPos.y>touch.y){
+            for (var i =0; i<Math.floor(touchPos.y/cell.height)-Math.floor(touch.y/cell.height); i++){
+                tEngine.pushAction('moveDown');
+            }
+        }
+        touch = touchPos;
+    });
     var setCCC = function(c){
         //some exception handling would be nice...
         canvas = c;
@@ -64,9 +140,10 @@ var worldClass = function(initParams) {
             width : 10,
             height : 20,
             content : [],
-            dirty : []
+            dirty : [],
+            shape : []
         };
-        setCCC(initParams.canvas||$('#tcanvas')[0]);
+        setCCC(initParams.canvas||layer.getCanvas());
     } else {
         //some exception handling would be nice...
         grid = initParams.worldMap.grid;
@@ -75,6 +152,7 @@ var worldClass = function(initParams) {
     for (var i=0;i<grid.width;i++){
         grid.content.push([]);
         grid.dirty.push([]);
+        grid.shape.push([]);
         for (var j=0;j<grid.height;j++){
             grid.content[i].push('clear');
             grid.dirty[i].push(false);
@@ -136,19 +214,19 @@ var worldClass = function(initParams) {
                     (grid.content[x][y] !== undefined) &&
                     (grid.dirty[x][y]||assumeDirty)
                 ){
-                    var fComm;
-                    if (grid.content[x][y] === 'clear'){
-                        fComm = 'clearRect';
-                    } else {
-                        fComm='fillRect';
-                        context.fillStyle = grid.content[x][y];
+                    if (grid.shape[x][y]) { grid.shape[x][y].destroy(); }
+                    if (grid.content[x][y] !== 'clear'){
+                        grid.shape[x][y] = new Kinetic.Rect({
+                            fill: grid.content[x][y],
+                            shadowEnabled: false,
+                            strokeEnabled: false,
+                            x: Math.round(x*cell.width), 
+                            y: Math.round(y*cell.height), 
+                            width: Math.round(cell.width), 
+                            height: Math.round(cell.height)
+                        });
+                        layer.add(grid.shape[x][y]);
                     }
-                    context[fComm](
-                        Math.round(x*cell.width), 
-                        Math.round(y*cell.height), 
-                        Math.round(cell.width), 
-                        Math.round(cell.height)
-                    );
                     // context.strokeRect( pos.x[i], pos.y[i], cell.width,
                     // cell.height ); 
                     // (nothing but a reminder of the existence of strokeRect)
@@ -156,14 +234,24 @@ var worldClass = function(initParams) {
                 }
             }
         }
+        text.moveToTop();
+        bigButton.moveToTop();
+        stage.draw();
     };
     this.resize = function(cWidth, cHeight){
-        canvas.height=cHeight;
-        canvas.width=cWidth; 
-        canvas.style.height = cHeight+'px';
-        canvas.style.width  = cWidth+'px';
+        text.setAttr('fontSize', 14*cHeight/480);
+        stage.setSize(cWidth, cHeight);
+        bigButton.setSize(cWidth, cHeight);
+        bgImage.setSize(cWidth, cHeight);
+        layer.setSize(cWidth, cHeight);
         tThis.setCell();
         tThis.redrawDirtyCells(true);
+    };
+    this.destroy = function(){
+        layer.destroyChildren();
+        layer.destroy();
+        stage.destroyChildren();
+        stage.destroy();
     };
 };
 
@@ -213,6 +301,8 @@ var tEngineClass = function(initParams){
     var $help = initParams.$help||$( "#dialog-message-help" );
     var $pause = initParams.$help||$( "#dialog-message-pause" );
     var onPause = initParams.onPause||null;
+    var onHelp = initParams.onHelp||null;
+    var gOver = initParams.gOver||null; 
     var $gover = initParams.$gover||$( "#dialog-message-gover" );
     var $win = initParams.$win||$('#win');
     var $lose = initParams.$lose||$('#lose');
@@ -228,133 +318,171 @@ var tEngineClass = function(initParams){
             pause : undefined
         };
     var actions = initParams.actions||{
-        rotateLeft : keyValue('a'),
-        rotateRight : keyValue('d'),
-        moveLeft : keyValue('leftArrow'),
-        moveRight : keyValue('rightArrow'),
-        moveDown : keyValue('downArrow'),
-        drop : keyValue('spacebar'),
-        pause : keyValue('p'),
-        help : keyValue('h'),
-        restart : keyValue('r')
-    };
-    var move = function() {
-        tWorld.updateGridPos('clear',tTromino.getCurrentCoordinates());
-        tTromino.updatePosition();
-        tWorld.updateGridPos(
-            tTrominoClass.colors(tTromino.getType()),
-            tTromino.getCurrentCoordinates()
-        );
-    };
-    var isAvailable = function(pos){
-        for (var j in pos.x){
-            if ((!tWorld.isClear(pos.x[j],pos.y[j]) &&
-                !tTromino.isCurrent(pos.x[j],pos.y[j])) ||//(!free && !myself)
-                (pos.y[j]>=tWorld.getGridParams().height) ||//|| overflow(down)
-                (pos.x[j]>=tWorld.getGridParams().width) ||//|| overflow(right)
-                (pos.x[j]<0)){                             //|| overflow(left)
-                return false;
-            }
-        }
-        return true;
-    };
-    var getBorder = function(testPos){
-        /*
-         * Returns min free distance between tetromino and filled
-         * cells (end of grid if none) downwards.
-         */
-        var pos = testPos;
-        pos.distance=-1;
-        while (isAvailable(pos)){
-            for (var i in pos.x){
-                pos.y[i]++;
-            }
-            pos.distance++;
-        }
-        if (pos.distance !== -1) {
-            for (var i in pos.x){
-                pos.y[i]--;
-            }
-        }
-        return pos;
-    };
-    var resolve = function() {
-        /*
-         * 1) If lines to chop:
-         *      -chop lines (full rows),
-         *      -increase lines,(level),points
-         *      -test end of game (canvas overflow)
-         * 
-         * 2) If not EOG: call new tetromino
-         * 
-         * 3) Test end of game (grid override)
-         * 
-         * 
-         */
-
-        var fullRows = tWorld.getFullRows();
-        tWorld.updateGridRows(fullRows);
-        
-        lines+=fullRows.length;
-        points+=fullRows.length*fullRows.length*(level+1)*100;
-        level = startLevel + Math.floor(lines/10);
-        
-        $level.text(level);
-        $lines.text(lines);
-        $score.text(points);
-        
-        var bOver = false; 
-        var coords = tTromino.getCurrentCoordinates();
-        for ( var i = 0;i<coords.y.length;i++) {
-            if (coords.y[i]<0){
-                gameOver();
-                bOver = true;
-                break;
-            }
-        }
-        if (!bOver){
-            var tInitParams;
-            tTromino.stop();
-            actionsBuffer = [];
-            if (!replay){
-                tInitParams = {
-                    x:Math.floor(tWorld.getGridParams().width / 2) - 1, 
-                    y:-1,
-                    t:tTrominoClass.types(Math.floor(Math.random() * 7)),
-                    r:0
-                };
-                tetrominosRecord.push(tInitParams);
-            } else {
-                tInitParams = tetrominosRecord.shift();
-                tempTetrominosRecord.push(tInitParams);
-            }
-            tTromino = new tTrominoClass(
-                tThis,
-                tInitParams.x,
-                tInitParams.y,
-                tInitParams.t,
-                tInitParams.r
-            );
-            coords = tTromino.getCurrentCoordinates();
-            for ( var i = 0;i<coords.y.length;i++) {
-                if (coords.y[i]>=0&&!tWorld.isClear(coords.x[i],coords.y[i])){
-                    gameOver();
-                    bOver = true;
-                    break;
-                }
-            }
-            if (!bOver){
-                tTromino.go();
-            }
-        }
+        rotateLeft : 65,
+        rotateRight : 68,
+        moveLeft : 37,
+        moveRight : 39,
+        moveDown : 40,
+        drop : 32,
+        pause : 80,
+        help : 72,
     };
     this.pushAction = function(action){
+        if (replay||onPause||onHelp||gOver) return;
         if (tThis.actionsBuffer===undefined){
             actionsBuffer.push(action);
             process();
         } else {
             actionsBuffer.push(action);
         }
+    };
+    var keyDown = function(event) {
+
+        var command = Object.keys(actions).filter(function(key) {
+            return actions[key] === event.which;
+        });
+        if (!replay){
+            if (command[0] !== undefined) {
+                var interval = keyDownInterval;
+                if (command[0] === 'moveLeft' || command[0] === 'moveRight'){
+                    interval = Math.min(
+                        keyDownInterval, 
+                        Math.max(
+                            Math.ceil(
+                                1000/(
+                                    1000/tTromino.fallInterval
+                                  + 500*tEngine.getLevel()/tTromino.fallInterval
+                                )
+                            ),
+                            100
+                        )
+                    );
+                }
+                if (keyDownIntervalIds[command[0]] === undefined) {
+                    tThis.pushAction(command[0]);
+                    keyDownIntervalIds[command[0]] = setInterval(
+                        function() {
+                            tThis.pushAction(command[0]);
+                        }, 
+                        interval
+                    );
+                }
+            }
+        } else {
+            if (command[0] === 'pause') {
+                onPause = true;
+                $pause.dialog("open");
+                stop();
+            } else {
+                if (event.which === 107||event.which===187){
+                    replaySpeed = Math.min(replaySpeed*2,32);
+                } else if (event.which === 109||event.which===189){
+                    replaySpeed = Math.max(replaySpeed/2,0.0625);
+                }
+            }
+        }
+    };
+    var keyUp = function(event) {
+        var command = Object.keys(actions).filter(function(key) {
+            return actions[key] === event.which;
+        });
+        clearInterval(keyDownIntervalIds[command[0]]);
+        keyDownIntervalIds[command[0]] = undefined;
+    };
+    this.start = function(){
+        var sIParams = initParams.startInitParams||{};
+        onHelp = sIParams.onHelp||false;
+        gOver = sIParams.gOver||false; 
+        tWorld = sIParams.tWorld?
+            sIParams.tWorld:
+            sIParams.tWorldInitParams?
+                new worldClass(sIParams.tWorldInitParams):
+                new worldClass({tEngine:tThis});
+        var imageObj = new Image();
+        imageObj.onload = function() {
+            tWorld.setBGImage(imageObj);
+        };
+        imageObj.src = 'kitty_bg.jpg';
+        $(window).resize(); //disgusting.
+        actionsBuffer = sIParams.actionsBuffer||[];
+        tempTetrominosRecord = sIParams.tempTetrominosRecord||[];
+        tempActionBuffersRecord = sIParams.tempActionBuffersRecord||[];
+        tempProcessIntervalsRecord = sIParams.tempProcessIntervalsRecord||[];
+        var tInitParams;
+        if (!replay){
+            tetrominosRecord = sIParams.tetrominosRecord||[];
+            actionBuffersRecord = sIParams.actionBuffersRecord||[];
+            processIntervalsRecord = sIParams.processIntervalsRecord||[];
+            tInitParams = sIParams.tTrominoInitParams||{
+                x:Math.floor(tWorld.getGridParams().width / 2) - 1, 
+                y:-1,
+                t:tTrominoClass.types(Math.floor(Math.random() * 7)),
+                r:0
+            };
+            tetrominosRecord.push(tInitParams);
+        } else {
+            replaySpeed = 1;
+            tInitParams = tetrominosRecord.shift();
+            tempTetrominosRecord.push(tInitParams);
+        }
+        tTromino = new tTrominoClass(
+            tThis,
+            tInitParams.x,
+            tInitParams.y,
+            tInitParams.t,
+            tInitParams.r
+        );
+        lines = sIParams.lines||0;
+        points = sIParams.points||0;
+        startLevel = sIParams.startLevel||defaultStartLevel;
+        level = sIParams.level||startLevel;
+        tWorld.writeMessage('lvl: '+level+' l: '+lines+' s: '+points);
+        $level.text(level);
+        $lines.text(lines);
+        $score.text(points);
+        tThis.go();
+    };
+    this.go = function() {
+        tThis.onPause = false;
+        $(window).unbind('keydown');
+        $(window).keydown(keyDown);
+        $(window).keyup(keyUp);
+        tTromino.go();
+        lastProcessTimeStamp = new Date().getTime();
+        process();
+        if (tThis.replay) { processActionsRecord(); }
+    };
+    var stop = function() {
+        tTromino.stop();
+        $(window).unbind('keydown');
+        if (!replay){
+            for (var i in keyDownIntervalIds) {
+                clearInterval(keyDownIntervalIds[i]);
+            }
+        } else {
+            clearInterval(replayIntervalId);
+        }    
+        $(window).keydown(function(event) {
+            var command = Object.keys(actions).filter(function(key) {
+                return actions[key] === event.which;
+            });
+            if ((command[0] === 'pause')&&(tThis.onPause)) {
+                $pause.dialog("close");
+                return;
+            }
+        });
+    };
+    var processActionsRecord = function(){
+        actionsBuffer = actionBuffersRecord.shift();
+        if (actionsBuffer){
+            tempActionBuffersRecord.push(actionsBuffer.slice(0));
+            var processInterval = processIntervalsRecord.shift();
+            tempProcessIntervalsRecord.push(processInterval);
+            replayIntervalId = setTimeout(
+                process, 
+                processInterval/Math.min(Math.max(replaySpeed,0.0625),32)
+            );
+        } 
     };
     var process = function() {
         var action;
@@ -450,6 +578,7 @@ var tEngineClass = function(initParams){
                         return;
                     case 'help':
                         stop();
+                        tThis.onHelp = true;
                         $help.dialog( "open" );
                         return;
                     default :
@@ -464,144 +593,115 @@ var tEngineClass = function(initParams){
         tWorld.redrawDirtyCells();
         if (replay) {processActionsRecord();}
     };
-    var keyDown = function(event) {
-
-        var command = Object.keys(actions).filter(function(key) {
-            return actions[key] === event.which;
-        });
-        if (!replay){
-            if (command[0] !== undefined) {
-                var interval = keyDownInterval;
-                if (command[0] === 'moveLeft' || command[0] === 'moveRight'){
-                    interval = Math.min(
-                        keyDownInterval, 
-                        Math.max(
-                            Math.ceil(
-                                1000/(
-                                    1000/tTromino.fallInterval
-                                  + 500*tEngine.getLevel()/tTromino.fallInterval
-                                )
-                            ),
-                            100
-                        )
-                    );
-                }
-                if (keyDownIntervalIds[command[0]] === undefined) {
-                    tThis.pushAction(command[0]);
-                    keyDownIntervalIds[command[0]] = setInterval(
-                        function() {
-                            tThis.pushAction(command[0]);
-                        }, 
-                        interval
-                    );
-                }
-            }
-        } else {
-            if (command[0] === 'pause') {
-                onPause = true;
-                $pause.dialog("open");
-                stop();
-            } else {
-                if (event.which === 107||event.which===187){
-                    replaySpeed = Math.min(replaySpeed*2,32);
-                } else if (event.which === 109||event.which===189){
-                    replaySpeed = Math.max(replaySpeed/2,0.0625);
-                }
-            }
-        }
-    };
-    var keyUp = function(event) {
-        var command = Object.keys(actions).filter(function(key) {
-            return actions[key] === event.which;
-        });
-        clearInterval(keyDownIntervalIds[command[0]]);
-        keyDownIntervalIds[command[0]] = undefined;
-    };
-    this.start = function(){
-        var sIParams = initParams.startInitParams||{};
-        tWorld = sIParams.tWorld?
-            sIParams.tWorld:
-            sIParams.tWorldInitParams?
-                new worldClass(sIParams.tWorldInitParams):
-                new worldClass();
-        actionsBuffer = sIParams.actionsBuffer||[];
-        tempTetrominosRecord = sIParams.tempTetrominosRecord||[];
-        tempActionBuffersRecord = sIParams.tempActionBuffersRecord||[];
-        tempProcessIntervalsRecord = sIParams.tempProcessIntervalsRecord||[];
-        var tInitParams;
-        if (!replay){
-            tetrominosRecord = sIParams.tetrominosRecord||[];
-            actionBuffersRecord = sIParams.actionBuffersRecord||[];
-            processIntervalsRecord = sIParams.processIntervalsRecord||[];
-            tInitParams = sIParams.tTrominoInitParams||{
-                x:Math.floor(tWorld.getGridParams().width / 2) - 1, 
-                y:-1,
-                t:tTrominoClass.types(Math.floor(Math.random() * 7)),
-                r:0
-            };
-            tetrominosRecord.push(tInitParams);
-        } else {
-            replaySpeed = 1;
-            tInitParams = tetrominosRecord.shift();
-            tempTetrominosRecord.push(tInitParams);
-        }
-        tTromino = new tTrominoClass(
-            tThis,
-            tInitParams.x,
-            tInitParams.y,
-            tInitParams.t,
-            tInitParams.r
+    var move = function() {
+        tWorld.updateGridPos('clear',tTromino.getCurrentCoordinates());
+        tTromino.updatePosition();
+        tWorld.updateGridPos(
+            tTrominoClass.colors(tTromino.getType()),
+            tTromino.getCurrentCoordinates()
         );
-        lines = sIParams.lines||0;
-        points = sIParams.points||0;
-        startLevel = sIParams.startLevel||defaultStartLevel;
-        level = sIParams.level||startLevel;
+    };
+    var isAvailable = function(pos){
+        for (var j in pos.x){
+            if ((!tWorld.isClear(pos.x[j],pos.y[j]) &&
+                !tTromino.isCurrent(pos.x[j],pos.y[j])) ||//(!free && !myself)
+                (pos.y[j]>=tWorld.getGridParams().height) ||//|| overflow(down)
+                (pos.x[j]>=tWorld.getGridParams().width) ||//|| overflow(right)
+                (pos.x[j]<0)){                             //|| overflow(left)
+                return false;
+            }
+        }
+        return true;
+    };
+    var getBorder = function(testPos){
+        /*
+         * Returns min free distance between tetromino and filled
+         * cells (end of grid if none) downwards.
+         */
+        var pos = testPos;
+        pos.distance=-1;
+        while (isAvailable(pos)){
+            for (var i in pos.x){
+                pos.y[i]++;
+            }
+            pos.distance++;
+        }
+        if (pos.distance !== -1) {
+            for (var i in pos.x){
+                pos.y[i]--;
+            }
+        }
+        return pos;
+    };
+    var resolve = function() {
+        /*
+         * 1) If lines to chop:
+         *      -chop lines (full rows),
+         *      -increase lines,(level),points
+         *      -test end of game (canvas overflow)
+         * 
+         * 2) If not EOG: call new tetromino
+         * 
+         * 3) Test end of game (grid override)
+         * 
+         * 
+         */
+
+        var fullRows = tWorld.getFullRows();
+        tWorld.updateGridRows(fullRows);
+        
+        lines+=fullRows.length;
+        points+=fullRows.length*fullRows.length*(level+1)*100;
+        level = startLevel + Math.floor(lines/10);
+
+        tWorld.writeMessage('lvl: '+level+' l: '+lines+' s: '+points);
         $level.text(level);
         $lines.text(lines);
         $score.text(points);
-        tThis.go();
-    };
-    var processActionsRecord = function(){
-        actionsBuffer = actionBuffersRecord.shift();
-        if (actionsBuffer){
-            tempActionBuffersRecord.push(actionsBuffer.slice(0));
-            var processInterval = processIntervalsRecord.shift();
-            tempProcessIntervalsRecord.push(processInterval);
-            replayIntervalId = setTimeout(
-                process, 
-                processInterval/Math.min(Math.max(replaySpeed,0.0625),32)
+        
+        var coords = tTromino.getCurrentCoordinates();
+        for ( var i = 0;i<coords.y.length;i++) {
+            if (coords.y[i]<0){
+                gameOver();
+                gOver = true;
+                break;
+            }
+        }
+        if (!gOver){
+            var tInitParams;
+            tTromino.stop();
+            actionsBuffer = [];
+            if (!replay){
+                tInitParams = {
+                    x:Math.floor(tWorld.getGridParams().width / 2) - 1, 
+                    y:-1,
+                    t:tTrominoClass.types(Math.floor(Math.random() * 7)),
+                    r:0
+                };
+                tetrominosRecord.push(tInitParams);
+            } else {
+                tInitParams = tetrominosRecord.shift();
+                tempTetrominosRecord.push(tInitParams);
+            }
+            tTromino = new tTrominoClass(
+                tThis,
+                tInitParams.x,
+                tInitParams.y,
+                tInitParams.t,
+                tInitParams.r
             );
-        } 
-    };
-    this.go = function() {
-        tThis.onPause = false;
-        $(window).unbind('keydown');
-        $(window).keydown(keyDown);
-        $(window).keyup(keyUp);
-        tTromino.go();
-        lastProcessTimeStamp = new Date().getTime();
-        process();
-        if (tThis.replay) { processActionsRecord(); }
-    };
-    var stop = function() {
-        tTromino.stop();
-        $(window).unbind('keydown');
-        if (!replay){
-            for (var i in keyDownIntervalIds) {
-                clearInterval(keyDownIntervalIds[i]);
+            coords = tTromino.getCurrentCoordinates();
+            for ( var i = 0;i<coords.y.length;i++) {
+                if (coords.y[i]>=0&&!tWorld.isClear(coords.x[i],coords.y[i])){
+                    gameOver();
+                    gOver = true;
+                    break;
+                }
             }
-        } else {
-            clearInterval(replayIntervalId);
-        }    
-        $(window).keydown(function(event) {
-            var command = Object.keys(actions).filter(function(key) {
-                return actions[key] === event.which;
-            });
-            if ((command[0] === 'pause')&&(tThis.onPause)) {
-                $pause.dialog("close");
-                return;
+            if (!gOver){
+                tTromino.go();
             }
-        });
+        }
     };
     var gameOver = function(){
         stop();
@@ -625,21 +725,6 @@ var tEngineClass = function(initParams){
         }
         $gover.dialog("open");
     };
-    function keyValue(key){
-        var keys = {
-            a: 65,
-            h: 72,
-            d: 68,
-            p: 80,
-            intro : 13,
-            spacebar : 32,
-            leftArrow : 37,
-            upArrow : 38,
-            rightArrow : 39,
-            downArrow : 40
-        };
-        return keys[key];
-    };
     $help.dialog({
         autoOpen: false,
         modal: true,
@@ -648,7 +733,7 @@ var tEngineClass = function(initParams){
                 $(this).dialog( "close" );
             }
         },
-        close: function(event, ui) { tThis.go(); }
+        close: function(event, ui) { onHelp=false; tThis.go(); }
     });
     $pause.dialog({
         autoOpen: false,
@@ -678,7 +763,7 @@ var tEngineClass = function(initParams){
                 $(this).dialog( "close" );
             }
         },
-        close: function(event, ui) { tThis.start(); }
+        close: function(event, ui) { tWorld.destroy(); gOver=false; tThis.start(); }
     });
 };
 
@@ -816,29 +901,38 @@ $(document).ready(function() {
     tEngine = new tEngineClass();
     tEngine.start();
     $(window).resize(function() {
-        var wWidth = 0.85*$(window).width();
-        var wHeight = 0.85*$(window).height();
+        var fullBoard = tEngine.getWorld().getFullBoard();
+        var wWidth = $(window).width()*(fullBoard?0.98:0.85);
+        var wHeight = $(window).height()*(fullBoard?0.98:0.85);
         var tHeight = Math.min(2*wWidth, wHeight);
-        tHeight -= (((0.85*tHeight)%20)/0.85);
+        tHeight -= fullBoard?tHeight%20:(((0.85*tHeight)%20)/0.85);
         var hHeight = 0.05*tHeight;
-        var cHeight = 0.85*tHeight;
+        var cHeight = fullBoard?tHeight:0.85*tHeight;
         var cWidth = cHeight/2;
-        var tWidth = 2*cWidth+0.003*tHeight; 
+        var tWidth = fullBoard?cWidth:2*cWidth+0.003*tHeight; 
         var fHeight = 0.10 * tHeight;
-        var canvas = document.getElementById('tcanvas');
         
         $('#game').height(cHeight);
         $('#game').width(tWidth);
         $('#board').height(cHeight);
         $('#board').width(cWidth);
-        $('#panel').height(cHeight);
-        $('#panel').width(cWidth);
-        $('#panel').css('border-left-width', 0.003*tHeight + 'px');
-        $('.display').css('margin-top', 0.17*tHeight + 'px');
-        $('.display').css('font-size', 0.04*tHeight + 'px');
-        $('p').css('font-size', 0.03*tHeight + 'px');
-        $('#dialog-message-help p').css('font-size', 0.025*tHeight + 'px');
-        $('h1').css('font-size', 0.06*tHeight + 'px');
+        if (fullBoard){
+            $('#header').hide();
+            $('#panel').hide();
+            $('#footer').hide();
+        } else {
+            $('#header').show();
+            $('#panel').show();
+            $('#footer').show();
+            $('#panel').height(cHeight);
+            $('#panel').width(cWidth);
+            $('#panel').css('border-left-width', 0.003*tHeight + 'px');
+            $('.display').css('margin-top', 0.17*tHeight + 'px');
+            $('.display').css('font-size', 0.04*tHeight + 'px');
+            $('p').css('font-size', 0.03*tHeight + 'px');
+            $('#dialog-message-help p').css('font-size', 0.025*tHeight + 'px');
+            $('h1').css('font-size', 0.06*tHeight + 'px');
+        }
         tEngine.getWorld().resize(cWidth, cHeight);
     });
     $(window).resize();
