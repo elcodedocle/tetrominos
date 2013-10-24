@@ -45,6 +45,16 @@ var worldClass = function(initParams) {
     tThis.geinitParams = function (){return initParams;};
     var tEngine = initParams.tEngine;
     var canvas=null, context=null, grid=null, cell=null;
+    var bgImage=new Kinetic.Image({
+        x: 0,
+        y: 0,
+        image: new Image(),
+        width: 100,
+        height: 100
+    });
+    this.setBGImage = function(imageObj){
+        bgImage.setImage(imageObj);
+    };
     var stage = new Kinetic.Stage(initParams.stage||{
         container: 'board'
     });
@@ -53,6 +63,7 @@ var worldClass = function(initParams) {
     var fullBoard = initParams.fullBoard||false;
     this.getFullBoard = function(){return fullBoard;};
     var layer = initParams.layer||new Kinetic.Layer();
+    layer.add(bgImage);
     var bigButton = new Kinetic.Rect({
         opacity: 0,
         x: 0,
@@ -231,6 +242,7 @@ var worldClass = function(initParams) {
         text.setAttr('fontSize', 14*cHeight/480);
         stage.setSize(cWidth, cHeight);
         bigButton.setSize(cWidth, cHeight);
+        bgImage.setSize(cWidth, cHeight);
         layer.setSize(cWidth, cHeight);
         tThis.setCell();
         tThis.redrawDirtyCells(true);
@@ -386,6 +398,11 @@ var tEngineClass = function(initParams){
             sIParams.tWorldInitParams?
                 new worldClass(sIParams.tWorldInitParams):
                 new worldClass({tEngine:tThis});
+        var imageObj = new Image();
+        imageObj.onload = function() {
+            tWorld.setBGImage(imageObj);
+        };
+        imageObj.src = 'kitty_bg.jpg';
         $(window).resize(); //disgusting.
         actionsBuffer = sIParams.actionsBuffer||[];
         tempTetrominosRecord = sIParams.tempTetrominosRecord||[];
