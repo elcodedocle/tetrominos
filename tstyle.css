@@ -1,7 +1,9 @@
 @import url('http://fonts.googleapis.com/css?family=Roboto:300');
 body {
     background: #eee;
-    text-align: center
+    text-align: center;
+    margin: 0;
+    padding: 0;
 }
 #tcanvas {
     background-image: url(kitty_bg.jpg);
