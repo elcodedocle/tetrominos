@@ -10,7 +10,7 @@ body {
 }
 #game {
     background: #fff;
-    border: 1px solid #ccc;
+    border: solid #ccc;
     margin: auto;
 }
 #board {
