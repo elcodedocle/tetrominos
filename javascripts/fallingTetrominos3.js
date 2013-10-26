@@ -14,7 +14,6 @@
  *  -Dynamic random map (grows a row per timeout during gameplay)
  *  -2 player
  *  -2 player online
- *  -Touch controls for tablets and smartphones
  *  -Impossibru mode, quadrapassel algorithm (worst is always next) 
  * 
  * I'll be shitting all over my bad coding practices and poor 
