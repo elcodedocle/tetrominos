@@ -1,4 +1,4 @@
-@import url('lib/Roboto.css');
+@import url('http://fonts.googleapis.com/css?family=Roboto:300');
 body {
     background: #eee;
     text-align: center;
@@ -10,7 +10,7 @@ body {
 }
 #game {
     background: #fff;
-    border: 1px solid #ccc;
+    border: solid #ccc;
     margin: auto;
 }
 #board {

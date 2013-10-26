@@ -42,57 +42,73 @@ var worldClass = function(initParams) {
     'use strict';
     var tThis = this;
     initParams = initParams||{};
-    tThis.geinitParams = function (){return initParams;};
+    this.getInitParams = function (){return initParams;};
     var tEngine = initParams.tEngine;
-    var canvas=null, context=null, grid=null, cell=null;
-    var bgImage=new Kinetic.Image({
+    var grid=initParams.grid||null, cell=initParams.cell||null;
+    var bgImage = initParams.bgImage||new Kinetic.Image({
         x: 0,
         y: 0,
         image: new Image(),
-        width: 100,
-        height: 100
+        width: 100, //overrided by $windowResize
+        height: 100 //overrided by $windowResize
     });
-    var stage = new Kinetic.Stage(initParams.stage||{
+    var stage = initParams.stage||new Kinetic.Stage({
         container: 'board'
     });
-    var touch = initParams.touch||{};
-    var itsATap = initParams.touch||false;
-    var fullBoard = initParams.fullBoard||false;
-    this.getFullBoard = function(){return fullBoard;};
-    var layer = initParams.layer||new Kinetic.Layer();
-    this.setBGImage = function(imageObj){
-        bgImage.setSize(layer.getSize());
-        bgImage.setImage(imageObj);
-        layer.add(bgImage);
-        $(window).resize();
+    var touchPos = initParams.touchPos||{};
+    var itsATap = initParams.itsATap||false;
+    //if fullBoard is set to true, calling windowResize will only display the 
+    //board (tWorld) and hide panel, header, footer and anything else.
+    var fullBoard = initParams.fullBoard||false; 
+    this.getFullBoard = function(){
+        return fullBoard;
     };
+    var layer = initParams.layer||new Kinetic.Layer();
     var bigButton = new Kinetic.Rect({
         opacity: 0,
         x: 0,
         y: 0,
-        width: 100,
-        height: 100
+        width: 100, //overrided by $windowResize
+        height: 100 //overrided by $windowResize
     });
     layer.add(bigButton);
     stage.add(layer);
-    this.setCell = function(){
-        cell = {
-            width : canvas.width / grid.width,
-            height : canvas.height / grid.height
-        };
-    };
+    var textSize = initParams.textSize||$('p').css('font-size');
     var text = new Kinetic.Text({
-        x: 10,
-        y: 10,
+        x:  textSize, //overrided by $windowResize
+        y:  textSize, //overrided by $windowResize
         fontFamily: 'Roboto',
-        fontSize: $('p').css('font-size'),
+        fontSize: textSize, //overrided by $windowResize
         text: '',
         fill: 'black'
     });
     layer.add(text);
     this.writeMessage = function(message) {
         text.setText(message);
-        //layer.draw();
+    };
+    var setCell = function(){
+        cell = {
+            width : stage.getWidth() / grid.width,
+            height : stage.getHeight() / grid.height
+        };
+    };
+    this.resize = function(cWidth, cHeight){
+        text.setAttr('fontSize', 14*cHeight/480);
+        stage.setSize(cWidth, cHeight);
+        bigButton.setSize(cWidth, cHeight);
+        bgImage.setSize(cWidth, cHeight);
+        layer.setSize(cWidth, cHeight);
+        setCell();
+        tThis.redrawDirtyCells(true);
+    };
+    this.$windowResize = initParams.$windowResize||function() {
+        return $(window).resize();
+    };
+    this.setBGImage = function(imageObj){
+        bgImage.setSize(layer.getSize());
+        bgImage.setImage(imageObj);
+        layer.add(bgImage);
+        tThis.$windowResize(); //WHY ???
     };
     bigButton.on('tap', function(evt) {
         evt.cancelBubble = true;
@@ -100,42 +116,63 @@ var worldClass = function(initParams) {
             tEngine.pushAction('rotateLeft'); 
             if (!fullBoard){
                 fullBoard=true;
-                $(window).resize();
-            }
+                tThis.$windowResize();
+            } 
         }
     });
     bigButton.on('touchstart', function(evt) {
         evt.cancelBubble = true;
         itsATap = true;
-        touch=stage.getTouchPosition();
+        touchPos=stage.getTouchPosition();
     });
     bigButton.on('touchmove', function(evt) {
         evt.cancelBubble = true;
         itsATap = false;
-        var touchPos = stage.getTouchPosition();
-        if (touch.x>touchPos.x){
-            for (var i =0; i<Math.floor(touch.x/cell.width)-Math.floor(touchPos.x/cell.width); i++){
+        var curTouchPos = stage.getTouchPosition();
+        if (touchPos.x>curTouchPos.x){
+            var cells = Math.floor(
+                touchPos.x/cell.width-curTouchPos.x/cell.width
+            );
+            for (var i =0; 
+                i<cells; 
+                i++
+            ){
                 tEngine.pushAction('moveLeft');
             }
+            if (tEngine.isReplay()){
+                if (cells>0) { tEngine.decreaseReplaySpeed(); }
+            }
+            if (cells>0) touchPos = curTouchPos;
         } else {
-            for (var i =0; i<Math.floor(touchPos.x/cell.width)-Math.floor(touch.x/cell.width); i++){
+            var cells = Math.floor(
+                curTouchPos.x/cell.width-touchPos.x/cell.width
+            );
+            for (
+                var i =0; 
+                i<cells; 
+                i++
+            ){
                 tEngine.pushAction('moveRight');
             }
+            if (tEngine.isReplay()){
+                if (cells>0) { tEngine.increaseReplaySpeed(); }
+            }
+            if (cells>0) touchPos = curTouchPos;
         }
-        if (touchPos.y>touch.y){
-            for (var i =0; i<Math.floor(touchPos.y/cell.height)-Math.floor(touch.y/cell.height); i++){
+        if (curTouchPos.y>touchPos.y){
+            var cells = Math.floor(
+                curTouchPos.y/cell.height-touchPos.y/cell.height
+            );
+            for (
+                var i =0; 
+                i<cells; 
+                i++
+            ){
                 tEngine.pushAction('moveDown');
             }
+            if (cells>0) touchPos = curTouchPos;
         }
-        touch = touchPos;
     });
-    var setCCC = function(c){
-        //some exception handling would be nice...
-        canvas = c;
-        canvas.width = c.width; //clears the canvas
-        context = canvas.getContext('2d');
-        tThis.setCell();
-    };
     
     if (initParams.worldMap ===  undefined){
         grid = initParams.grid||{
@@ -145,11 +182,11 @@ var worldClass = function(initParams) {
             dirty : [],
             shape : []
         };
-        setCCC(initParams.canvas||layer.getCanvas());
+        setCell();
     } else {
         //some exception handling would be nice...
         grid = initParams.worldMap.grid;
-        setCCC(initParams.worldMap.canvas);
+        setCell();
     }
     for (var i=0;i<grid.width;i++){
         grid.content.push([]);
@@ -199,17 +236,19 @@ var worldClass = function(initParams) {
         for (var l in fullRows){
             var y=fullRows[l];
             //TODO: handle special case y==0
-            for (var i=y-1;i>=0;i--){
+            var skyLinePeak = tEngine.getSkyLinePeak();
+            for (var i=y-1;i>=skyLinePeak;i--){
                 for (var j=0;j<grid.width;j++){
+                    if (grid.content[j][i+1]!==grid.content[j][i]){
+                        grid.dirty[j][i+1] = true;
+                    }
                     grid.content[j][i+1]=grid.content[j][i];
-                    grid.dirty[j][i+1] = true;
                 }
             }
         }
     };
     this.redrawDirtyCells = function(assumeDirty){
         assumeDirty = assumeDirty||false;
-        context.lineWidth = 1;
         for (var x=0;x<grid.width;x++){
             for (var y=0;y<=grid.height;y++){
                 if (
@@ -229,9 +268,6 @@ var worldClass = function(initParams) {
                         });
                         layer.add(grid.shape[x][y]);
                     }
-                    // context.strokeRect( pos.x[i], pos.y[i], cell.width,
-                    // cell.height ); 
-                    // (nothing but a reminder of the existence of strokeRect)
                     grid.dirty[x][y]=false;
                 }
             }
@@ -239,15 +275,6 @@ var worldClass = function(initParams) {
         text.moveToTop();
         bigButton.moveToTop();
         stage.draw();
-    };
-    this.resize = function(cWidth, cHeight){
-        text.setAttr('fontSize', 14*cHeight/480);
-        stage.setSize(cWidth, cHeight);
-        bigButton.setSize(cWidth, cHeight);
-        bgImage.setSize(cWidth, cHeight);
-        layer.setSize(cWidth, cHeight);
-        tThis.setCell();
-        tThis.redrawDirtyCells(true);
     };
     this.destroy = function(){
         layer.destroyChildren();
@@ -276,8 +303,9 @@ var tEngineClass = function(initParams){
 
     var tThis = this;
     initParams = initParams||{};
-    tThis.geinitParams = function (){return initParams;};
+    this.geinitParams = function (){return initParams;};
     var replay = initParams.replay||false;
+    var wasReplay = initParams.wasReplay||false;
     this.isReplay = function(){return replay;}; 
     var tetrominosRecord = initParams.tetrominosRecord||[];
     var actionBuffersRecord = initParams.actionBuffersRecord||[];
@@ -286,8 +314,8 @@ var tEngineClass = function(initParams){
     var tempActionBuffersRecord = initParams.tempActionBuffersRecord||[];
     var tempProcessIntervalsRecord = initParams.tempProcessIntervalsRecord||[];
     var replaySpeed = initParams.replaySpeed||1;
-    var replayIntervalId;
-    var lastProcessTimeStamp = null;
+    var replayTimeoutId;
+    var lastProcessTimeStamp = initParams.lastProcessTimeStamp||null;
     var tWorld = initParams.tWorld||null; 
     this.getWorld = function(){ return tWorld; };
     var actionsBuffer = initParams.actionsBuffer||[];
@@ -296,19 +324,27 @@ var tEngineClass = function(initParams){
     var points = initParams.points||null; 
     var startLevel = initParams.startLevel||null; 
     var level = initParams.level||null; 
-    var $lines = initParams.$lines||$('#lines');
-    var $score = initParams.$score||$('#score');
-    var $level = initParams.$level||$('#level');
+    var setLinesDisplayText = initParams.setLinesDisplayText||function(text){
+        $('#lines').text(text);
+    };
+    var setScoreDisplayText = initParams.setScoreDisplayText||function(text){
+        $('#score').text(text);
+    };
+    var getHighScore = initParams.$getHighScore||function(){ 
+        return localStorage.getItem('tetrominos-highscore'); 
+    };
+    var setHighScore = initParams.$setHighScore||function(){ 
+        return localStorage.setItem('tetrominos-highscore', points);
+    };
+    var setLevelDisplayText = initParams.setLevelDisplayText||function(text){
+        $('#level').text(text);
+    };
     this.getLevel = function(){return level;};
-    var $help = initParams.$help||$( "#dialog-message-help" );
-    var $pause = initParams.$help||$( "#dialog-message-pause" );
     var onPause = initParams.onPause||null;
+    this.getOnPause = function(){ return onPause; };
     var onHelp = initParams.onHelp||null;
+    this.getOnHelp = function(){ return onHelp; };
     var gOver = initParams.gOver||null; 
-    var $gover = initParams.$gover||$( "#dialog-message-gover" );
-    var $win = initParams.$win||$('#win');
-    var $lose = initParams.$lose||$('#lose');
-    var $first = initParams.$first||$('#first');
     var defaultStartLevel = initParams.defaultStartLevel||0;
     var keyDownInterval = initParams.keyDownInterval||200;
     var keyDownIntervalIds = initParams.keyDownIntervalIds||{
@@ -329,14 +365,31 @@ var tEngineClass = function(initParams){
         pause : 80,
         help : 72,
     };
+    var bindActions = initParams.bindActions||function(action, func){
+        return $(window).bind(action, func);
+    };
+    var unbindActions = initParams.unbindActions||function(action){
+        return $(window).unbind(action);
+    };
     this.pushAction = function(action){
-        if (replay||onPause||onHelp||gOver) return;
-        if (tThis.actionsBuffer===undefined){
+        if (replay||onHelp||onPause||gOver) return;
+        if (actionsBuffer.length===0){
             actionsBuffer.push(action);
             process();
         } else {
             actionsBuffer.push(action);
         }
+    };
+    this.increaseReplaySpeed = function(pow2ToXFactor){
+        if (!pow2ToXFactor) {pow2ToXFactor=1;}
+        replaySpeed = Math.min(replaySpeed*Math.pow(2,pow2ToXFactor),32);
+    };
+    this.decreaseReplaySpeed = function(pow2ToMinusXFactor){
+        if (!pow2ToMinusXFactor) {pow2ToMinusXFactor=1;}
+        replaySpeed = Math.max(
+            replaySpeed*Math.pow(2,-pow2ToMinusXFactor),
+            0.0625
+        );
     };
     var keyDown = function(event) {
 
@@ -372,14 +425,14 @@ var tEngineClass = function(initParams){
             }
         } else {
             if (command[0] === 'pause') {
-                onPause = true;
-                $pause.dialog("open");
-                stop();
+                tThis.pauseDialog.open();
             } else {
                 if (event.which === 107||event.which===187){
-                    replaySpeed = Math.min(replaySpeed*2,32);
+                    tThis.increaseReplaySpeed();
                 } else if (event.which === 109||event.which===189){
-                    replaySpeed = Math.max(replaySpeed/2,0.0625);
+                    tThis.decreaseReplaySpeed();
+                } else if (command[0]==='help'){
+                    tThis.helpDialog.open();
                 }
             }
         }
@@ -393,6 +446,7 @@ var tEngineClass = function(initParams){
     };
     this.start = function(){
         var sIParams = initParams.startInitParams||{};
+        onPause = sIParams.onPause||false;
         onHelp = sIParams.onHelp||false;
         gOver = sIParams.gOver||false; 
         tWorld = sIParams.tWorld?
@@ -405,7 +459,7 @@ var tEngineClass = function(initParams){
             tWorld.setBGImage(imageObj);
         };
         imageObj.src = 'kitty_bg.jpg';
-        $(window).resize(); //disgusting.
+        tWorld.$windowResize(); //disgusting (less than before).
         actionsBuffer = sIParams.actionsBuffer||[];
         tempTetrominosRecord = sIParams.tempTetrominosRecord||[];
         tempActionBuffersRecord = sIParams.tempActionBuffersRecord||[];
@@ -439,37 +493,35 @@ var tEngineClass = function(initParams){
         startLevel = sIParams.startLevel||defaultStartLevel;
         level = sIParams.level||startLevel;
         tWorld.writeMessage('lvl: '+level+' l: '+lines+' s: '+points);
-        $level.text(level);
-        $lines.text(lines);
-        $score.text(points);
+        setLevelDisplayText(level);
+        setLinesDisplayText(lines);
+        setScoreDisplayText(points);
         tThis.go();
     };
     this.go = function() {
-        tThis.onPause = false;
-        $(window).unbind('keydown');
-        $(window).keydown(keyDown);
-        $(window).keyup(keyUp);
-        tTromino.go();
+        unbindActions('keydown');
+        bindActions('keydown', keyDown);
+        bindActions('keyup', keyUp);
         lastProcessTimeStamp = new Date().getTime();
         process();
-        if (tThis.replay) { processActionsRecord(); }
+        if (replay) { processActionsRecord(); } else {tTromino.go();}
     };
     var stop = function() {
         tTromino.stop();
-        $(window).unbind('keydown');
+        unbindActions('keydown');
         if (!replay){
             for (var i in keyDownIntervalIds) {
                 clearInterval(keyDownIntervalIds[i]);
             }
         } else {
-            clearInterval(replayIntervalId);
+            window.clearTimeout(replayTimeoutId);
         }    
-        $(window).keydown(function(event) {
+        bindActions('keydown',function(event) {
             var command = Object.keys(actions).filter(function(key) {
                 return actions[key] === event.which;
             });
-            if ((command[0] === 'pause')&&(tThis.onPause)) {
-                $pause.dialog("close");
+            if ((command[0] === 'pause')&&(onPause)) {
+                tThis.pauseDialog.close();
                 return;
             }
         });
@@ -480,11 +532,11 @@ var tEngineClass = function(initParams){
             tempActionBuffersRecord.push(actionsBuffer.slice(0));
             var processInterval = processIntervalsRecord.shift();
             tempProcessIntervalsRecord.push(processInterval);
-            replayIntervalId = setTimeout(
+            replayTimeoutId = setTimeout(
                 process, 
                 processInterval/Math.min(Math.max(replaySpeed,0.0625),32)
             );
-        } 
+       } 
     };
     var process = function() {
         var action;
@@ -572,16 +624,14 @@ var tEngineClass = function(initParams){
                                 tTrominoClass.getCoordinates(t,{x:p.x,y:p.y},r)
                             ).distance
                         );
+                        move();
+                        resolve();
                         break;
                     case 'pause':
-                        tThis.onPause = true;
-                        $pause.dialog("open");
-                        stop();
+                        tThis.pauseDialog.open();
                         return;
                     case 'help':
-                        stop();
-                        tThis.onHelp = true;
-                        $help.dialog( "open" );
+                        tThis.helpDialog.open();
                         return;
                     default :
                         console.log(
@@ -593,7 +643,7 @@ var tEngineClass = function(initParams){
         }
         move();
         tWorld.redrawDirtyCells();
-        if (replay) {processActionsRecord();}
+        if (replay&&!onPause&&!onHelp) {processActionsRecord();}
     };
     var move = function() {
         tWorld.updateGridPos('clear',tTromino.getCurrentCoordinates());
@@ -614,6 +664,14 @@ var tEngineClass = function(initParams){
             }
         }
         return true;
+    };
+    this.getSkyLinePeak = function(){
+        var topLine = {x:[],y:[]}; 
+        for (var i=0;i<tWorld.getGridParams().width;i++){
+            topLine.x.push(i);
+            topLine.y.push(0);
+        }
+        return getBorder(topLine).distance;
     };
     var getBorder = function(testPos){
         /*
@@ -657,15 +715,14 @@ var tEngineClass = function(initParams){
         level = startLevel + Math.floor(lines/10);
 
         tWorld.writeMessage('lvl: '+level+' l: '+lines+' s: '+points);
-        $level.text(level);
-        $lines.text(lines);
-        $score.text(points);
+        setLevelDisplayText(level);
+        setLinesDisplayText(lines);
+        setScoreDisplayText(points);
         
         var coords = tTromino.getCurrentCoordinates();
         for ( var i = 0;i<coords.y.length;i++) {
             if (coords.y[i]<0){
                 gameOver();
-                gOver = true;
                 break;
             }
         }
@@ -696,77 +753,119 @@ var tEngineClass = function(initParams){
             for ( var i = 0;i<coords.y.length;i++) {
                 if (coords.y[i]>=0&&!tWorld.isClear(coords.x[i],coords.y[i])){
                     gameOver();
-                    gOver = true;
                     break;
                 }
             }
-            if (!gOver){
+            if (!gOver&&!replay){
                 tTromino.go();
             }
         }
     };
     var gameOver = function(){
-        stop();
-        $('.yourscore').text(points);
-        if(localStorage.getItem('tetrominos-highscore')) {
-            $first.hide();
-            $('.highscore').text(localStorage.getItem('tetrominos-highscore'));
-            if (points > localStorage.getItem('tetrominos-highscore')){ 
-                $lose.hide();
-                $win.show();
-                if (!replay) localStorage.setItem('tetrominos-highscore', points);
+        wasReplay = replay;
+        var currentHighscore = getHighScore();
+        if(currentHighscore) {
+            if (points > currentHighscore){
+                tThis.gOverDialog.open('win');
+                if (!wasReplay) {
+                    setHighScore(points);
+                }
             } else {
-                $win.hide();
-                $lose.show();
+                tThis.gOverDialog.open('lose');
             }
         } else {
-            $win.hide();
-            $lose.hide();
-            $first.show();
-            if (!replay) localStorage.setItem('tetrominos-highscore', points);
+            tThis.gOverDialog.open('first');
+            if (!wasReplay) { setHighScore(points); }
         }
-        $gover.dialog("open");
     };
-    $help.dialog({
-        autoOpen: false,
-        modal: true,
-        buttons: {
-            Ok: function() {
-                $(this).dialog( "close" );
+    this.helpDialog = initParams.helpDialog||{
+        open: function(){
+            if (onPause||onHelp||gOver) return;
+            onHelp = true;
+            stop();
+            $('#dialog-message-help').dialog('open');
+        },
+        close: function(){
+            $('#dialog-message-help').dialog("close");
+            //jquery-ui dialog sets close bind to onClose execution
+        },
+        onClose: function(){
+            if (!onHelp) return;
+            tThis.go();
+            onHelp=false; 
+        }
+    };
+    this.pauseDialog = initParams.pauseDialog||{
+        open: function(){
+            if (onPause||onHelp||gOver) return;
+            onPause = true;
+            stop();
+            $('#dialog-message-pause').dialog('open');
+        },
+        close: function(){
+            $('#dialog-message-pause').dialog('close');
+            //jquery-ui dialog sets close bind to onClose execution
+        },
+        onClose: function(){
+            if (!onPause) return;
+            tThis.go();
+            onPause=false; 
+        }
+    };
+    this.gOverDialog = initParams.gOverDialog||{
+        open: function(result){
+            gOver = true;
+            stop();
+            replay = false;
+            switch (result){
+                case 'lose': 
+                    $('.yourscore').text(points);
+                    $('.highscore').text(getHighScore());
+                    $('#first').hide(); 
+                    $('#win').hide();
+                    $('#lose').show(); 
+                    $('#dialog-message-gover').dialog('open');
+                    break;
+                case 'win': 
+                    $('.yourscore').text(points);
+                    $('.highscore').text(getHighScore());
+                    $('#first').hide();
+                    $('#lose').hide();
+                    $('#win').show();
+                    $('#dialog-message-gover').dialog('open');
+                    break;
+                case 'first':
+                    $('.yourscore').text(points);
+                    $('#win').hide();
+                    $('#lose').hide();
+                    $('#first').show(); 
+                    $('#dialog-message-gover').dialog('open');
+                    break;
             }
         },
-        close: function(event, ui) { onHelp=false; tThis.go(); }
-    });
-    $pause.dialog({
-        autoOpen: false,
-        modal: true,
-        buttons: {
-            Ok: function() {
-                $(this).dialog( "close" );
-            }
+        close: function(){
+            $('#dialog-message-gover').dialog('close');
+            //jquery-ui dialog sets close bind to onClose execution
         },
-        close: function(event, ui) { onPause=false; tThis.go(); }
-    });
-    $gover.dialog({
-        autoOpen: false,
-        modal: true,
-        buttons: {
-            "Replay": function() {
-                if (replay){
-                    actionBuffersRecord = tempActionBuffersRecord.slice(0);
-                    tetrominosRecord = tempTetrominosRecord.slice(0);
-                    processIntervalsRecord = tempProcessIntervalsRecord.slice(0);
-                }
-                replay=true;
-                $(this).dialog( "close" );
-            },
-            Ok: function() {
-                replay=false;
-                $(this).dialog( "close" );
-            }
-        },
-        close: function(event, ui) { tWorld.destroy(); gOver=false; tThis.start(); }
-    });
+        onClose: function(){
+            gOver = false;
+            tThis.restart();
+        }
+    };
+    this.setReplay = function(){
+        if (
+            wasReplay
+        ){ //means re-replay
+            actionBuffersRecord = tempActionBuffersRecord.slice(0);
+            tetrominosRecord = tempTetrominosRecord.slice(0);
+            processIntervalsRecord = tempProcessIntervalsRecord.slice(0);
+        };
+        replay = true;
+    };
+    this.restart = function(){
+        tWorld.destroy(); 
+        tThis.start(); 
+    };
 };
 
 
@@ -821,20 +920,18 @@ var tTrominoClass = function(engine, positionX,positionY,tType,rot) {
         return false;
     };
     this.go = function(){
-        if (!engine.isReplay()) {
-            fallIntervalId=setInterval(
-                function(){engine.pushAction('moveDown');},
-                Math.ceil(
-                    1000/(
-                        1000/tThis.fallInterval
-                       +(500*engine.getLevel()/tThis.fallInterval)
-                    )
+        fallIntervalId=setInterval(
+            function(){engine.pushAction('moveDown');},
+            Math.ceil(
+                1000/(
+                    1000/tThis.fallInterval
+                   +(500*engine.getLevel()/tThis.fallInterval)
                 )
-            );
-        }
+            )
+        );
     };
     this.stop = function(){
-        if (!engine.isReplay()) {clearInterval(fallIntervalId);}
+        clearInterval(fallIntervalId);
     };
     this.updatePosition = function(){
         position.x += tThis.vector[0];
@@ -900,10 +997,8 @@ tTrominoClass.types = function (index){
  * Ride on!
  */
 $(document).ready(function() {
-    tEngine = new tEngineClass();
-    tEngine.start();
     $(window).resize(function() {
-        var fullBoard = tEngine.getWorld().getFullBoard();
+        var fullBoard = tEngine?tEngine.getWorld().getFullBoard():false;
         var wWidth = $(window).width()*(fullBoard?0.98:0.85);
         var wHeight = $(window).height()*(fullBoard?0.98:0.85);
         var tHeight = Math.min(2*wWidth, wHeight);
@@ -937,7 +1032,52 @@ $(document).ready(function() {
         }
         tEngine.getWorld().resize(cWidth, cHeight);
     });
-    $(window).resize();
+    tEngine = new tEngineClass();
+    $('#dialog-message-help').dialog({
+        autoOpen: false,
+        modal: true,
+        buttons: {
+            Ok: function() {
+                $(this).dialog("close");
+            }
+        },
+        close: function(event, ui) { tEngine.helpDialog.onClose(); }
+    });
+    $('#dialog-message-pause').dialog({
+        autoOpen: false,
+        modal: true,
+        buttons: {
+            Ok: function() {
+                $(this).dialog("close");
+            }
+        },
+        close: function(event, ui) { tEngine.pauseDialog.onClose(); }
+    });
+    $('#dialog-message-gover').dialog({
+        autoOpen: false,
+        modal: true,
+        buttons: {
+            "Replay": function() {
+                tEngine.setReplay();
+                $(this).dialog("close");
+            },
+            Ok: function() {
+                $(this).dialog("close");
+            }
+        },
+        close: function(event, ui) { tEngine.gOverDialog.onClose(); }
+    });
+    tEngine.start();
+    document.addEventListener('touchstart', function(e) {
+        if (!tEngine.getOnHelp()&&!tEngine.getOnPause()) { 
+            if (tEngine.isReplay()) {
+                tEngine.helpDialog.open();
+            }
+            else {
+                tEngine.pushAction('help');
+            }
+        }
+    }, false);
     //var fps = 0;
     //setInterval(function(){fps++;},0);
     //setInterval(function(){console.log("fps: "+fps);fps=0;},1000);
