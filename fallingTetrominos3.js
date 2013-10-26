@@ -42,7 +42,7 @@ var worldClass = function(initParams) {
     'use strict';
     var tThis = this;
     initParams = initParams||{};
-    this.geinitParams = function (){return initParams;};
+    this.getInitParams = function (){return initParams;};
     var tEngine = initParams.tEngine;
     var grid=initParams.grid||null, cell=initParams.cell||null;
     var bgImage = initParams.bgImage||new Kinetic.Image({
