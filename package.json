@@ -1,0 +1,11 @@
+{
+    "name": "tetrominosjs",
+    "version": "0.0.0",
+    "description": "An html5 nodejs *etris clone from scratch",
+    "dependencies": {
+        "socket.io": "latest",
+        "express": "latest",
+        "jade": "latest"
+    },
+    "author": "elcodedocle"
+}
